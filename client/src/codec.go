@@ -19,7 +19,7 @@ func Decode (data [] byte) (*Message, error) {
 		return nil, err
 	}
 
-	length := data_size - 4
+	length := data_size - 4   // 减去刚刚读的id字节
 	data_buf := make([]byte, length)
 	err = binary.Read(buf_reader, binary.LittleEndian, &data_buf)
 	if err != nil {
@@ -29,7 +29,7 @@ func Decode (data [] byte) (*Message, error) {
 	message := &Message{}
 	message.data = data_buf
 	message.id = msg_id
-	message.size = length
+	message.size = length + 8
 
 	return message, nil
 }
@@ -38,13 +38,13 @@ func Decode (data [] byte) (*Message, error) {
 // 写
 func Encode(msg *Message) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	/*
-		err := binary.Write(buffer, binary.LittleEndian, msg.msg_size)
-		if err != nil {
-			return nil, err
-		}*/
 
-	err :=  binary.Write(buffer, binary.LittleEndian, msg.id)
+	err := binary.Write(buffer, binary.LittleEndian, msg.size)
+	if err != nil {
+		return nil, err
+	}
+
+	err =  binary.Write(buffer, binary.LittleEndian, msg.id)
 	if err != nil {
 		return nil, err
 	}

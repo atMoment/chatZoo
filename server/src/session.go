@@ -2,7 +2,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"net"
 )
@@ -42,7 +44,16 @@ func (s *_TcpSession) GetSessionUid() string {
 	return s.uid
 }
 
-func (s *_TcpSession) Send(message *Message) {}
+func (s *_TcpSession) Send(msg *Message) {
+	s.sendCh <- msg
+}
+
+func (s *_TcpSession) Destroy() {
+	s.cancelCtx()
+	if s.conn != nil {
+		_ = s.conn.Close()
+	}
+}
 
 // 每次无线循环读数据，是阻塞式等待读
 func (s *_TcpSession) read_routine() {
@@ -53,43 +64,14 @@ func (s *_TcpSession) read_routine() {
 		case <-s.ctx.Done():
 			break loop
 		default:
-
-/*
-			// 读长度
-			buf := make([]byte, 1)
-			_, err := io.ReadFull(s.conn, buf)
+			msg, err := s._analyzeMessage(s.conn)
 			if err != nil {
-				fmt.Println("read data length failed")
-				continue
-			}
-			// 把数据长度存一下
-			buf_reader := bytes.NewReader(buf)
-			var size int32
-			err = binary.Read(buf_reader, binary.LittleEndian, &size)
-			if err != nil {
-				fmt.Println("save data length failed")
-				continue
-			}
-*/
-			// 读数据
-			data_buf := make([]byte, 1024)
-			//_, err := io.ReadFull(s.conn, data_buf)           // 这个函数很奇怪
-			_, err1 := s.conn.Read(data_buf)
-			if err1 != nil {
-				fmt.Println("read data failed err =", err1)
-				break loop
-			}
-
-			// 解码
-			msg, err2 := Decode(data_buf)
-			if err2 != nil {
-				fmt.Println("decode data failed")
+				fmt.Println("anlasize []byte failed err is", err)
 				break loop
 			}
 			s.reviceCh <- msg
 		}
 	}
-
 }
 
 // 无限循环写数据，等待阻塞写
@@ -114,6 +96,42 @@ loop:
 		}
 	}
 }
+
+func (s *_TcpSession) _analyzeMessage(conn net.Conn) (*Message, error){
+	// 读数据
+	size_buf := make([]byte, 4)
+	_, err := s.conn.Read(size_buf)
+	if err != nil {
+		fmt.Println("conn.read data size failed err is ", err)
+		return nil,err
+	}
+
+	var size int32
+	buf_reader := bytes.NewReader(size_buf)
+	err = binary.Read(buf_reader, binary.LittleEndian, &size)
+	if err != nil {
+		fmt.Println("decode size failed err is", err)
+		return nil, err
+	}
+
+	data_buf := make([]byte, size -4)                    // 减去刚刚读过的size字节
+	//_, err := io.ReadFull(s.conn, data_buf)           // 这个函数很奇怪
+	_, err = s.conn.Read(data_buf)
+	if err != nil {
+		fmt.Println("conn.read data failed err =", err)
+		return nil, err
+	}
+
+	// 解码
+	msg, err := Decode(data_buf)
+	if err != nil {
+		fmt.Println("decode data failed err is ", err)
+		return nil, err
+	}
+	return msg, nil
+
+}
+
 
 
 

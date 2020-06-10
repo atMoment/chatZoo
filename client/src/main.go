@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -14,7 +16,7 @@ const Response_chat = 3
 const Request_chat = 4
 
 func main() {
-	fmt.Println("I'm client1")
+	fmt.Println("I'm client")
 	conn, err := net.Dial("tcp", "127.0.0.1:3344")
 	if err != nil {
 		fmt.Println("net.Dial err = ", err)
@@ -54,25 +56,54 @@ func ReadStdin(p chan string, d chan int) {
 			d <- 1
 			return
 		}
+		//fmt.Printf("input read string is %v\n", input)
 		p <- input
 	}
 }
 
 func ReadSocket(p chan string, conn net.Conn, d chan int) {
 	for {
-		data_buf := make([]byte, 1024)
-		_, err := conn.Read(data_buf)
-
+		var str string
+		err := AnalyzeMessage(conn, &str)
 		if err != nil {
 			fmt.Println("conn.read failed err is ", err)
 			d <- 1
 			return
 		}
-		p <- string(data_buf[:])
-
+		p <- str
 	}
 }
+func AnalyzeMessage(conn net.Conn, str *string) error{
+	size_buf := make([]byte, 4)
+	_, err := conn.Read(size_buf)
+	if err != nil {
+		fmt.Println("read data size failed err is ", err)
+		return err
+	}
+	var size int32
+	buf := bytes.NewReader(size_buf)
+	err = binary.Read(buf, binary.LittleEndian, &size)
+	if err != nil {
+		fmt.Println("decode size failed err is ", err)
+		return err
+	}
 
+	data_buf := make([]byte, size -4)     // 减去刚刚读的size字节
+	_, err = conn.Read(data_buf)
+	if err != nil {
+		fmt.Println("read data failed err is ", err)
+		return err
+	}
+
+	msg, err2 := Decode(data_buf)
+	if err2 != nil {
+		fmt.Println("decode data failed err is ", err2)
+		return err
+	}
+
+	*str = string(msg.GetString()[:])
+	return nil
+}
 
 func RequestJoin(conn net.Conn) {
 	msg := NewMessage(Request_join, []byte("1"))

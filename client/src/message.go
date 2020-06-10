@@ -10,7 +10,7 @@ func NewMessage(id int32, data[] byte) *Message {
 	msg := &Message {
 		id : id,
 		data: data,
-		size : int32(len(data)) + 4,
+		size : int32(len(data)) + 8,
 	}
 	return msg
 }

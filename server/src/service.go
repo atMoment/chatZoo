@@ -1,4 +1,5 @@
 // 网络底层函数  与上层接洽
+// 处理与客户端连接以及消息接洽
 package main
 
 import (
@@ -12,7 +13,9 @@ type Service struct {
 	listen net.Listener
 	ctx    context.Context
 	cancelCtx context.CancelFunc
-	on_message func(msg *Message, s *Service)
+	on_message func(msg *Message)
+	on_connect func (sess *_TcpSession)
+	on_disconnect func ()
 	count int
 }
 
@@ -31,9 +34,18 @@ func NewService(host string, connect_type string) *Service {
 	return s
 }
 
-func (s *Service) ReqMessageHandle(handler func(msg *Message, s *Service)) {
+func (s *Service) RegisterMessageHandle(handler func(msg *Message)) {
 	s.on_message = handler
 }
+
+func (s *Service) RegisterConnectHandle(handler func(sess *_TcpSession)) {
+	s.on_connect = handler
+}
+
+func (s *Service) RegisterDisConnectHandle(handler func()) {
+	s.on_disconnect = handler
+}
+
 
 func (s *Service) AcceptConn() {
 	defer s.Destroy()
@@ -72,33 +84,23 @@ func (s *Service) ConnectHandle(conn net.Conn, uid net.Addr) {
 	defer conn.Close()
 	go session.read_routine()
 	go session.write_routine()
+	if (s.on_connect != nil) {
+		s.on_connect(session)
+	}
 
+loop:
 	for {
 		select {
-		case msg := <-session.reviceCh:
+		case msg := <-session.reviceCh:                                       // 如果多个地方写如通道，将从通道里面去取东西，再依次回复，将导致阻塞
 			if session.reviceCh != nil {
-				go s.on_message(msg, s)
+				go s.on_message(msg)
 			}
+			case <-session.ctx.Done() :
+				go s.on_disconnect()
+				break loop
 		}
 	}
 }
-
-func (s *Service) SendMe(msg *Message, sess *_TcpSession ) {
-	sess.sendCh <- msg
-}
-
-/*
-func (s *Service) SendAll(msg *Message, list []string){
-	fmt.Println("service Send all")
-	s.TravelSess()
-	for _, v := range list {
-		v2, ok := s.sess.Load(v)
-		if ok {
-			v2.(*_TcpSession).sendCh <- msg
-			fmt.Println("sendCh has some", msg)
-		}
-	}
-}*/
 
 func (s *Service) SendAll(msg *Message, list []string){
 	f := func(k, v interface{}) bool {
