@@ -45,6 +45,14 @@ func decode(v reflect.Value) error {
 			return err
 		}
 		v.SetString(s)
+	case reflect.Struct:
+		l := v.NumField()
+		for i := 0; i < l; i++ {
+			err := decode(v.Field(i))
+			if err != nil {
+				return err
+			}
+		}
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type", v.Kind()))
 	}

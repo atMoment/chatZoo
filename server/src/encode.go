@@ -30,6 +30,14 @@ func encode(v reflect.Value) error {
 		writeInt32(int32(v.Int()))
 	case reflect.String:
 		writeString(v.String())
+	case reflect.Struct:
+		l := v.NumField()
+		for i := 0; i < l; i++ {
+			err := encode(v.Field(i))
+			if err != nil {
+				return err
+			}
+		}
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type", v.Kind()))
 	}

@@ -26,11 +26,17 @@ func decode(v reflect.Value) error {
 		if err != nil {
 			return err
 		}
+		if !v.CanSet() {
+			return errors.New("[decode] the value can't be set")
+		}
 		v.SetInt(int64(n))
 	case reflect.Uint8:
 		n, err := readUint8()
 		if err != nil {
 			return err
+		}
+		if !v.CanSet() {
+			return errors.New("[decode] the value can't be set")
 		}
 		v.SetUint(uint64(n))
 	case reflect.Int32:
@@ -38,15 +44,29 @@ func decode(v reflect.Value) error {
 		if err != nil {
 			return err
 		}
+		if !v.CanSet() {
+			return errors.New("[decode] the value can't be set")
+		}
 		v.SetInt(int64(n))
 	case reflect.String:
 		s, err := readString()
 		if err != nil {
 			return err
 		}
+		if !v.CanSet() {
+			return errors.New("[decode] the value can't be set")
+		}
 		v.SetString(s)
+	case reflect.Struct:
+		l := v.NumField()
+		for i := 0; i < l; i++ {
+			err := decode(v.Field(i))
+			if err != nil {
+				return err
+			}
+	    }
 	default:
-		return errors.New(fmt.Sprintf("%s, %d, %d", "not support this type ", v.Kind(), v.Type()))
+		return errors.New(fmt.Sprintf("%s, %d", "not support this type ", v.Kind()))
 	}
 	return nil
 }

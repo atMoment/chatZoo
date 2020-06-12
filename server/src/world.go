@@ -100,7 +100,8 @@ func (w *World) ResponseJoin(msg *Message, sess *_TcpSession) {
 }
 
 func (w *World) ResponseChat(msg *Message, sess *_TcpSession) {
-	rmsg := NewMessage(Response_chat, msg.GetString().([]byte))
+	reschat := ResChat{msg.GetString().(ReqChat).words}
+	rmsg := NewMessage(Response_chat, reschat)
 	//fmt.Printf("response chat is rstr  %s\n", msg.GetString())
 
 	uid := sess.GetSessionUid()

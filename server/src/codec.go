@@ -29,7 +29,7 @@ func DDecode (data [] byte) (*Message, error) {
 	message.size = data_size + 4                                  // data的字节加上id字节和size字节
 
 	data_buf := make([]byte, length)
-	message.data, err = GetMessageInfo(msg_id)
+	message.data, err = minfo.GetMessageInfo(msg_id)
 	if err != nil {
 		return nil, err
 	}

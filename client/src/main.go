@@ -10,11 +10,6 @@ import (
 )
 
 
-const Request_join = 1
-const Response_join = 2
-const Response_chat = 3
-const Request_chat = 4
-
 func main() {
 	fmt.Println("I'm client")
 	conn, err := net.Dial("tcp", "127.0.0.1:3344")
@@ -106,8 +101,8 @@ func AnalyzeMessage(conn net.Conn, str *string) error{
 }
 
 func RequestJoin(conn net.Conn) {
-	var i int32 = 1
-	msg := NewMessage(Request_join, i)
+	reqjoin := ReqJoin{1}
+	msg := NewMessage(Request_join, reqjoin)
 	data, err := EEncode(msg)
 	fmt.Println("RequestJoin msg is ", msg.id, msg.size, msg.data)
 
@@ -122,7 +117,8 @@ func RequestJoin(conn net.Conn) {
 }
 
 func RequestChat(conn net.Conn, str string) {
-	msg := NewMessage(Request_chat, str)
+	reqchat := ReqChat{str}
+	msg := NewMessage(Request_chat, reqchat)
 	data, err := EEncode(msg)
 
 	if err != nil {

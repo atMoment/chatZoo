@@ -6,32 +6,40 @@ import (
 	"reflect"
 )
 
-var  MessageInfo  map[int32]interface{}
+type _MessageInfo struct {
+	msg_info map[int32] interface{}
+}
+//var  MessageInfo  map[int32]interface{}
 
+var minfo *_MessageInfo = NewMessageInfo()
 
-
-
-func addInfo(id int32, info interface{}) {
-	MessageInfo[id] = info
+func NewMessageInfo() *_MessageInfo {
+	return &_MessageInfo{
+		msg_info: make(map[int32]interface{}),
+	}
 }
 
-func GetMessageInfo(id int32) (interface{}, error) {
-	info, ok := MessageInfo[id]
+func (m *_MessageInfo) addInfo(id int32, info interface{}) {
+	m.msg_info[id] = info
+}
+
+func (m * _MessageInfo)GetMessageInfo(id int32) (interface{}, error) {
+	info, ok := m.msg_info[id]
 	if !ok {
 		fmt.Println("[GetInfo] failed msg_id is ", id)
 		return nil, errors.New("get message failed")
 	}
 
-	m := reflect.New(reflect.TypeOf(info).Elem())
-	q := m.Interface().(interface{})
+	t := reflect.New(reflect.TypeOf(info).Elem())
+	q := t.Interface().(interface{})
 
 	return q, nil
 }
 func init() {
-	MessageInfo = make(map[int32]interface{})
-	addInfo(Request_join,  &RequestJoin{})
-	addInfo(Response_join, &ResponseJoin{})
-	addInfo(Request_chat,  &RequestChat{})
-	addInfo(Response_chat, &ResponseChat{})
+
+	minfo.addInfo(Request_join,  &ReqJoin{})
+	minfo.addInfo(Response_join, &ResJoin{})
+	minfo.addInfo(Request_chat,  &ReqChat{})
+	minfo.addInfo(Response_chat, &ResChat{})
 }
 
