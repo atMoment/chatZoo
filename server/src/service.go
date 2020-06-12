@@ -6,16 +6,14 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"sync"
 )
 type Service struct {
-	sess   sync.Map
 	listen net.Listener
 	ctx    context.Context
 	cancelCtx context.CancelFunc
-	on_message func(msg *Message)
+	on_message func(msg *Message, sess *_TcpSession)
 	on_connect func (sess *_TcpSession)
-	on_disconnect func ()
+	on_disconnect func (sess *_TcpSession)
 	count int
 }
 
@@ -27,14 +25,17 @@ func NewService(host string, connect_type string) *Service {
 		return nil
 	}
 	s :=  &Service{
-		sess:   sync.Map{},
 		listen: l,
+		count: 0,
+		on_message: nil,
+		on_connect: nil,
+		on_disconnect: nil,
 	}
 	s.ctx, s.cancelCtx = context.WithCancel(context.Background())
 	return s
 }
 
-func (s *Service) RegisterMessageHandle(handler func(msg *Message)) {
+func (s *Service) RegisterMessageHandle(handler func(msg *Message,  sess *_TcpSession)) {
 	s.on_message = handler
 }
 
@@ -42,7 +43,7 @@ func (s *Service) RegisterConnectHandle(handler func(sess *_TcpSession)) {
 	s.on_connect = handler
 }
 
-func (s *Service) RegisterDisConnectHandle(handler func()) {
+func (s *Service) RegisterDisConnectHandle(handler func(sess *_TcpSession)) {
 	s.on_disconnect = handler
 }
 
@@ -79,7 +80,6 @@ func (s *Service) Destroy() {
 
 func (s *Service) ConnectHandle(conn net.Conn, uid net.Addr) {
 	session  := NewSession(conn, uid.String())
-	s.sess.Store(session.GetSessionUid(), session)
 
 	defer conn.Close()
 	go session.read_routine()
@@ -88,33 +88,18 @@ func (s *Service) ConnectHandle(conn net.Conn, uid net.Addr) {
 		s.on_connect(session)
 	}
 
+	// 或者在这里开 session处理函数的协程，就不用下面的操作了。
+
 loop:
 	for {
 		select {
 		case msg := <-session.reviceCh:                                       // 如果多个地方写如通道，将从通道里面去取东西，再依次回复，将导致阻塞
 			if session.reviceCh != nil {
-				go s.on_message(msg)
+				s.on_message(msg, session)
 			}
 			case <-session.ctx.Done() :
-				go s.on_disconnect()
+				go s.on_disconnect(session)
 				break loop
 		}
 	}
-}
-
-func (s *Service) SendAll(msg *Message, list []string){
-	f := func(k, v interface{}) bool {
-		fmt.Println("range session k is ", k)
-		v.(*_TcpSession).sendCh <- msg
-		return true
-	}
-	s.sess.Range(f)
-}
-
-func (s *Service) TravelSess(){
-	f := func(k, v interface{}) bool {
-		fmt.Println("range session k is ", k)
-		return true
-	}
-	s.sess.Range(f)
 }

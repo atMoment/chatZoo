@@ -7,21 +7,17 @@ import (
 	"sync"
 )
 
-// 现在是临时行为，没有注册登录等存外部存储的操作，服务器重启时，所有房间和玩家都销毁。
-// 可以把数据都存在json里，下次读
-// 服务器不重启，玩家上线下线（客户端开闭），这个要做把
-// 下线后再上线， 客户端端口变了，uid变了，现在没有账号的，上线下线也在做不了。
 
 type World struct {
 	rooms *sync.Map
-	player *Player
+	player *sync.Map
 	//maptable map[int] interface{}    回调函数关系可以用关系表存储
 }
 
 func NewWorld() *World {
 	w := &World {
 		rooms: & sync.Map{},
-		player: nil,
+		player: &sync.Map{},
 		//maptable: make(map[int] interface{}),
 	}
 	return w
@@ -36,7 +32,8 @@ func (w *World) Destroy() {
 	}
 	// 世界里每个房间依次走这个流程
 	w.rooms.Range(f)
-	w.player.Destroy()
+	// 销毁玩家列表稍后再补
+	//w.player.Destroy()
 }
 
 func (w * World) GetRoom(rid int) *Room {
@@ -49,69 +46,95 @@ func (w *World) RemoveRoom(rid int) {
 	w.rooms.Delete(rid)
 }
 
+func (w *World) GetPlayer(uid string) *Player {
+	u, _ := w.player.Load(uid)
+	return u.(*Player)
+}
+
+func (w *World) AddPlayer (player * Player) {
+	w.player.Store(player.GetUid(), player)
+}
+
+func (w *World) RemovePlayer(uid string) {
+	w.player.Delete(uid)
+}
+
 // 收到客户端消息处理
 // 整体处理消息，可以考虑分开，执行一个函数， 内部处理由各个系统自己定义 ，怎么写
-func (w *World) DealMessage (msg *Message) {
+func (w *World) DealMessage (msg *Message,  sess *_TcpSession) {
 	id := msg.GetID()
 
 	switch id {
 	case Request_join:
-		w.ResponseJoin(msg)
+		w.ResponseJoin(msg, sess)
 		// 打印聊天记录
 	case Request_chat:
 		// 广播用户说的话
-		w.ResponseChat(msg)
+		w.ResponseChat(msg, sess)
 	}
 }
 
-func (w *World) ResponseJoin(msg *Message) {
+func (w *World) ResponseJoin(msg *Message, sess *_TcpSession) {
 	str := msg.GetString()
 	var rid int
 	fmt.Scanln(str, &rid)                          // 这个很耗
-	if w.player == nil {
-		fmt.Println("world player is nil!!")
+
+	uid := sess.GetSessionUid()
+	u := w.GetPlayer(uid)
+	fmt.Println("response rid is , str is", rid, str)
+	if u == nil {
+		fmt.Println("player is not regisiter in world")
 		return
 	}else {
-		w.player.SetRid(rid)
+		u.SetRid(rid)
 	}
 	r := w.GetRoom(rid)
-	r.AddUser(w.player.GetUid(), w.player)
+	fmt.Println("")
+	r.AddUser(uid, u)
+	_ = r.GetPlayers()
 
 	rstr := "congraulation  join!!!!"
-	rmsg := NewMessage(Response_join, []byte(rstr))
+	rmsg := NewMessage(Response_join, rstr)
 
 	r.SendRoom(rmsg)
 }
 
-func (w *World) ResponseChat(msg *Message) {
-	rmsg := NewMessage(Response_chat, msg.GetString())
+func (w *World) ResponseChat(msg *Message, sess *_TcpSession) {
+	rmsg := NewMessage(Response_chat, msg.GetString().([]byte))
 	//fmt.Printf("response chat is rstr  %s\n", msg.GetString())
+
+	uid := sess.GetSessionUid()
+	u := w.GetPlayer(uid)
+
 	var rid int
-	if w.player == nil {
+	if u == nil {
 		fmt.Println("world player is nil!!")
 		return
 	}else{
-		rid = w.player.GetRid()
+		rid = u.GetRid()
 	}
 	w.SendRoom(rid, rmsg)
 }
 
 // 客户端连接成功就创建一个玩家
 func (w *World) ConnectHandle(sess *_TcpSession) {
-	w.player = NewPlayer(sess.GetSessionUid(), sess)
+	player := NewPlayer(sess.GetSessionUid(), sess)
+	w.AddPlayer(player)
 }
 
 // 客户端下线就销毁该玩家
-func (w *World) DisconnetHandle() {
-	if (w.player != nil) {
-		w.player.Destroy()
-		w.player = nil
+func (w *World) DisconnetHandle(sess *_TcpSession) {
+	uid := sess.GetSessionUid()
+	u := w.GetPlayer(uid)
+	if (u == nil) {
+		fmt.Println("player is nil")
+		return
 	}
+	u.Destroy()
+	w.RemovePlayer(uid)
 }
 
 func (w *World) SendRoom(rid int, msg *Message) {
 	r := w.GetRoom(rid)
 	r.SendRoom(msg)
 }
-
-

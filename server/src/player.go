@@ -38,3 +38,7 @@ func (u *Player) GetUid() string {
 func (u *Player) SendUser(msg *Message) {
 	u.sess.Send(msg)
 }
+
+func (u *Player) Loop() {
+	
+}

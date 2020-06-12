@@ -95,21 +95,24 @@ func AnalyzeMessage(conn net.Conn, str *string) error{
 		return err
 	}
 
-	msg, err2 := Decode(data_buf)
+	msg, err2 := DDecode(data_buf)
 	if err2 != nil {
 		fmt.Println("decode data failed err is ", err2)
 		return err
 	}
 
-	*str = string(msg.GetString()[:])
+	*str = msg.GetString().(string)
 	return nil
 }
 
 func RequestJoin(conn net.Conn) {
-	msg := NewMessage(Request_join, []byte("1"))
-	data, err := Encode(msg)
+	var i int32 = 1
+	msg := NewMessage(Request_join, i)
+	data, err := EEncode(msg)
+	fmt.Println("RequestJoin msg is ", msg.id, msg.size, msg.data)
 
 	if err != nil {
+		fmt.Println("msg EEncode failed err is ", err)
 		return
 	}
 	_, err2 := conn.Write(data)
@@ -119,8 +122,8 @@ func RequestJoin(conn net.Conn) {
 }
 
 func RequestChat(conn net.Conn, str string) {
-	msg := NewMessage(Request_chat, []byte(str))
-	data, err := Encode(msg)
+	msg := NewMessage(Request_chat, str)
+	data, err := EEncode(msg)
 
 	if err != nil {
 		return
