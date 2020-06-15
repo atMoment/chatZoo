@@ -34,9 +34,9 @@ func main() {
 		case msg := <- input_chan :
 			RequestChat(conn, msg)
 		case msg2 := <- socket_chan:
-			fmt.Println("msg is ", msg2)
+			fmt.Println("[main] msg is ", msg2)
 		case <- done_chan:
-			fmt.Println("done_chan is over")
+			fmt.Println("[main] done_chan is over")
 			break loop
 		}
 	}
@@ -89,14 +89,21 @@ func AnalyzeMessage(conn net.Conn, str *string) error{
 		fmt.Println("read data failed err is ", err)
 		return err
 	}
-
 	msg, err2 := DDecode(data_buf)
 	if err2 != nil {
 		fmt.Println("decode data failed err is ", err2)
 		return err
 	}
 
-	*str = msg.GetString().(string)
+	switch msg.id {
+	case Response_join:
+		*str = msg.GetString().(*ResJoin).Words
+	case Response_chat:
+		*str = msg.GetString().(*ResChat).Words
+	default:
+		fmt.Println("[AnalyzeMessage] 现在还没有对应的消息处理")
+	}
+
 	return nil
 }
 
@@ -104,7 +111,6 @@ func RequestJoin(conn net.Conn) {
 	reqjoin := ReqJoin{1}
 	msg := NewMessage(Request_join, reqjoin)
 	data, err := EEncode(msg)
-	fmt.Println("RequestJoin msg is ", msg.id, msg.size, msg.data)
 
 	if err != nil {
 		fmt.Println("msg EEncode failed err is ", err)

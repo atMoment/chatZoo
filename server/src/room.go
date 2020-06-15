@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -60,7 +59,6 @@ func (r *Room) GetPlayers() []string {
 	list := make([]string, 0)
 	f := func(k, v interface{}) bool {
 		list = append(list, k.(string))
-		fmt.Println("playeruid  is k ", k)
 		return true
 	}
 	r.players.Range(f)

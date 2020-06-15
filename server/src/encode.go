@@ -20,7 +20,7 @@ func Encode(buff *bytes.Buffer, data interface{})(int, error) {
 	if err != nil {
 		return 0, err
 	}
-	buff = my_buff
+	*buff = *my_buff                   //不能改变buff的指针
 	return buff.Len(), nil
 }
 

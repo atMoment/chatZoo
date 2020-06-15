@@ -75,13 +75,11 @@ func (w *World) DealMessage (msg *Message,  sess *_TcpSession) {
 }
 
 func (w *World) ResponseJoin(msg *Message, sess *_TcpSession) {
-	str := msg.GetString()
-	var rid int
-	fmt.Scanln(str, &rid)                          // 这个很耗
+	str := msg.GetString().(*ReqJoin)
+	rid := int(str.Room_id)
 
 	uid := sess.GetSessionUid()
 	u := w.GetPlayer(uid)
-	fmt.Println("response rid is , str is", rid, str)
 	if u == nil {
 		fmt.Println("player is not regisiter in world")
 		return
@@ -89,18 +87,18 @@ func (w *World) ResponseJoin(msg *Message, sess *_TcpSession) {
 		u.SetRid(rid)
 	}
 	r := w.GetRoom(rid)
-	fmt.Println("")
 	r.AddUser(uid, u)
 	_ = r.GetPlayers()
 
 	rstr := "congraulation  join!!!!"
-	rmsg := NewMessage(Response_join, rstr)
+	resjoin := ResJoin{rstr}
+	rmsg := NewMessage(Response_join, resjoin)
 
 	r.SendRoom(rmsg)
 }
 
 func (w *World) ResponseChat(msg *Message, sess *_TcpSession) {
-	reschat := ResChat{msg.GetString().(ReqChat).words}
+	reschat := ResChat{msg.GetString().(*ReqChat).Words}
 	rmsg := NewMessage(Response_chat, reschat)
 	//fmt.Printf("response chat is rstr  %s\n", msg.GetString())
 

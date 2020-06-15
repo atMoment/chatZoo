@@ -7,16 +7,17 @@ const Request_chat = 4
 
 
 type ReqJoin struct {
-	room_id int32
+	Room_id int32
 }
 
 type ResJoin struct {
+	Words string
 }
 
 type ReqChat struct {
-	words string
+	Words string
 }
 
 type ResChat struct {
-	words string
+	Words string
 }

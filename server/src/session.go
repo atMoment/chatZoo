@@ -66,7 +66,7 @@ func (s *_TcpSession) read_routine() {
 		default:
 			msg, err := s._analyzeMessage(s.conn)
 			if err != nil {
-				fmt.Println("anlasize []byte failed err is", err)
+				fmt.Println("[read_routine] anlasize []byte failed err is", err)
 				break loop
 			}
 			s.reviceCh <- msg
@@ -114,8 +114,6 @@ func (s *_TcpSession) _analyzeMessage(conn net.Conn) (*Message, error){
 		return nil, err
 	}
 
-	fmt.Println("analyzeMessage size is ", size)
-
 	data_buf := make([]byte, size -4)                    // 减去刚刚读过的size字节
 	//_, err := io.ReadFull(s.conn, data_buf)           // 这个函数很奇怪
 	_, err = s.conn.Read(data_buf)
@@ -123,8 +121,6 @@ func (s *_TcpSession) _analyzeMessage(conn net.Conn) (*Message, error){
 		fmt.Println("conn.read data failed err =", err)
 		return nil, err
 	}
-	fmt.Println("analyzeMessage data _buf is ", data_buf)
-
 
 	// 解码
 	msg, err := DDecode(data_buf)
@@ -132,9 +128,7 @@ func (s *_TcpSession) _analyzeMessage(conn net.Conn) (*Message, error){
 		fmt.Println("decode data failed err is ", err)
 		return nil, err
 	}
-	fmt.Println("read msg is ", msg)
 	return msg, nil
-
 }
 
 

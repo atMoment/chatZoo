@@ -20,18 +20,19 @@ func DDecode (data [] byte) (*Message, error) {
 		return nil, err
 	}
 
-	length := data_size - 4   // 减去刚刚读的id字节
-
 	message := &Message{}
 	message.id = msg_id
-	message.size = length + 8
+	message.size = data_size + 4
 
-	data_buf := make([]byte, length)
+	data_buf := data[4:]
+	message.data, err = minfo.GetMessageInfo(msg_id)
+	if err != nil {
+		return nil, err
+	}
 	err = Decode(data_buf, message.data)
 	if err != nil {
 		fmt.Println("read buf failed err is", err)
 		return nil, err
-
 	}
 
 	return message, nil
@@ -61,12 +62,10 @@ func EEncode(msg *Message) ([]byte, error) {
 	}
 
 	tmp_data := tmp_buffer.Bytes()
-	fmt.Println("EEncode data is ", tmp_data)
 	_, err = buffer.Write(tmp_data)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("add data EEcode this time buffer is ", buffer.Bytes())
 	return buffer.Bytes(), nil
 }
