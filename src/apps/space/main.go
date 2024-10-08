@@ -7,5 +7,5 @@ import (
 func main() {
 	app := NewApp()
 	app.run()
-	fmt.Println("main over")
+	fmt.Println("server main over")
 }
