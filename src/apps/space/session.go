@@ -32,7 +32,7 @@ func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Ses
 func (s *_Session) proc() {
 	s.wg.Add(1)
 	defer func() {
-		fmt.Println("groutine : session proc exit", s.conn.RemoteAddr())
+		fmt.Println("goroutine : session proc exit", s.conn.RemoteAddr())
 		s.wg.Done() // 给父亲发信号
 	}()
 	s.handleConnect()
@@ -53,10 +53,17 @@ func (s *_Session) handleConnect() {
 				fmt.Println("session handleConnect conn read err ", err)
 				return
 			}
+			word := string(ctosMsg)
 			// s.conn.LocalAddr() 这是服务器自己的地址
 			fmt.Printf("I'm server, I read client from:%v content:%v\n ", s.conn.RemoteAddr(), string(ctosMsg))
-			stocMsg := "welcome to my server"
-			_, err = s.conn.Write([]byte(stocMsg))
+			result, err := calculate(word)
+			if err != nil {
+				fmt.Println("session server calculate  err ", err)
+				continue
+			}
+			word += fmt.Sprintf(" = %d", result)
+
+			_, err = s.conn.Write([]byte(word))
 			if err != nil {
 				fmt.Println("session handleConnect conn write err ", err)
 				return

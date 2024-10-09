@@ -47,7 +47,7 @@ func (a *_App) acceptHandler(ln net.Listener) {
 	for {
 		conn, acceptErr := ln.Accept()
 		if acceptErr != nil {
-			fmt.Println("groutine: ln accept err ", acceptErr)
+			fmt.Println("goroutine: ln accept err ", acceptErr)
 			a.appCancel()            // 1 通知 多, 通知多个子协程退出
 			a.wg.Wait()              // 1 等待 多(多通知1), sync.WaitGroup等他们都结束才完全退出
 			a.exitChan <- struct{}{} // 给父协程发信号, 让老父亲别等了, 我也要销毁了
