@@ -53,17 +53,20 @@ func (s *_Session) handleConnect() {
 				fmt.Println("session handleConnect conn read err ", err)
 				return
 			}
-			word := string(ctosMsg)
+			var stocMsg string
 			// s.conn.LocalAddr() 这是服务器自己的地址
 			fmt.Printf("I'm server, I read client from:%v content:%v\n ", s.conn.RemoteAddr(), string(ctosMsg))
-			result, err := calculate(word)
+			result, err := calculate(string(ctosMsg))
 			if err != nil {
-				fmt.Println("session server calculate  err ", err)
-				continue
+				stocMsg = fmt.Sprintf("session server calculate, err:%v", err)
+			} else {
+				//fmt.Println(string(ctosMsg))
+				//stocMsg = fmt.Sprintf("%s = %d", "hh\r\n hello", result)
+				//_ = result
+				stocMsg = fmt.Sprintf("%s = %d", string(ctosMsg), result)
 			}
-			word += fmt.Sprintf(" = %d", result)
-
-			_, err = s.conn.Write([]byte(word))
+			fmt.Println(stocMsg)
+			_, err = s.conn.Write([]byte(stocMsg))
 			if err != nil {
 				fmt.Println("session handleConnect conn write err ", err)
 				return
