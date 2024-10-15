@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// 解码主要依靠 reflect.Set()
+// 解码主要依靠 reflect.Set(), 需要传入具体的类型
 
 // Decode  解码, 把二进制数据(字节流)转化为具体类型 [容器类会先读取长度再读取到容器]
 func Decode(data []byte, obj interface{}) error {

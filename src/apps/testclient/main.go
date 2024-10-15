@@ -83,7 +83,7 @@ func (c *_Client) receiveFromStdinAndWrite() {
 
 		msg := &common.MsgCmdReq{
 			MethodName: "Calculate",
-			Arg:        words,
+			Args:       words,
 		}
 		err := common.WriteToConn(c.conn, msg)
 		if err != nil {

@@ -119,7 +119,7 @@ const (
 type MsgCmdReq struct {
 	MethodName string
 	RoleID     string
-	Arg        string
+	Args       []byte
 }
 
 func (m *MsgCmdReq) GetID() int32 {
