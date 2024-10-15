@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -18,11 +19,12 @@ var (
 )
 
 type _Session struct {
-	conn   net.Conn
-	wg     *sync.WaitGroup
-	ticker *time.Ticker
-	ctx    context.Context
-	cancel context.CancelFunc
+	sessionID string
+	conn      net.Conn
+	wg        *sync.WaitGroup
+	ticker    *time.Ticker
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Session {
@@ -36,7 +38,7 @@ func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Ses
 	}
 }
 
-func (s *_Session) proc() {
+func (s *_Session) procLoop() {
 	s.wg.Add(1)
 	defer func() {
 		fmt.Println("goroutine : session proc exit", s.conn.RemoteAddr())
@@ -53,37 +55,36 @@ func (s *_Session) handleConnect() {
 		case <-s.ctx.Done():
 			fmt.Println("session handleConnect receive exit signal")
 			return
-		default: // 一直不断使用conn 读并且回复
-			ctosMsg, err := common.ReadFromConn(s.conn)
-			if err != nil {
-				fmt.Println("session handleConnect conn read err ", err)
-				return
-			}
-
-			err = s.replayClient(ctosMsg)
-			if err != nil {
-				if errors.Is(err, ErrDecodeFail) {
-					continue
-				}
-				return
-			}
+		default:
+			s.procMsg()
 		}
 	}
 }
 
-// replayClient 根据从客户端中读到的信息, 解释分析再发送结果给客户端
-func (s *_Session) replayClient(ctosMsg string) error {
-	var stocMsg string
-	// s.conn.LocalAddr() 这是服务器自己的地址
-	fmt.Printf("I'm server, I read client from:%v content:%v\n ", s.conn.RemoteAddr(), string(ctosMsg))
-	result, err := calculate(string(ctosMsg))
+// procMsg 处理客户端信息 一直不断使用conn 读并且处理逻辑回复
+func (s *_Session) procMsg() {
+	msg, err := common.ReadFromConn(s.conn)
 	if err != nil {
-		stocMsg = fmt.Sprintf("session server calculate, err:%v", err)
-	} else {
-		stocMsg = fmt.Sprintf("%s = %d", string(ctosMsg), result)
+		fmt.Println("session handleConnect conn read err ", err)
+		return
 	}
-	common.WriteToConn(s.conn, stocMsg)
-	return nil
+	switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
+	case *common.MsgCmdReq:
+		// 注意不要直接使用客户端发的roleID就Add
+		// s.conn.LocalAddr() 这是服务器自己的地址
+		entity, err2 := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn.RemoteAddr().String(), s.conn)
+		if err2 != nil {
+			fmt.Println("session handleConnect AddOrGetEntity err ", err2)
+			return
+		}
+		v := reflect.ValueOf(entity.role)
+		method := v.MethodByName(m.MethodName)
+		in := make([]reflect.Value, 1)
+		in[0] = reflect.ValueOf(m.Arg)
+		method.Call(in)
+	default:
+		fmt.Println("unknow msg ", m)
+	}
 }
 
 // sendHeartbeat 实时给客户端发送心跳, 告诉他我还活着

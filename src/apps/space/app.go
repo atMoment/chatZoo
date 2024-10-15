@@ -54,7 +54,7 @@ func (a *_App) acceptHandler(ln net.Listener) {
 			return
 		}
 		session := NewSession(a.appCtx, conn, a.wg)
-		go session.proc()
+		go session.procLoop()
 	}
 }
 

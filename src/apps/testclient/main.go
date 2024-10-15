@@ -81,7 +81,11 @@ func (c *_Client) receiveFromStdinAndWrite() {
 			words += v // todo 好像这种写法很消耗,有新的写法
 		}
 
-		err := common.WriteToConn(c.conn, words)
+		msg := &common.MsgCmdReq{
+			MethodName: "Calculate",
+			Arg:        words,
+		}
+		err := common.WriteToConn(c.conn, msg)
 		if err != nil {
 			fmt.Println("conn.Write failed ", err)
 			return
@@ -93,11 +97,16 @@ func (c *_Client) receiveFromStdinAndWrite() {
 func (c *_Client) read() {
 	defer func() { c.wg.Done(); fmt.Println(" read over") }()
 	for {
-		stocMsg, err := common.ReadFromConn(c.conn)
+		msg, err := common.ReadFromConn(c.conn)
 		if err != nil {
 			fmt.Println("common.ReadFromConn err", err)
 			return
 		}
-		fmt.Println("client read context ", stocMsg)
+		switch m := msg.(type) {
+		case *common.MsgCmdRsp:
+			fmt.Println("client read context ", m.Arg)
+		default:
+			fmt.Println("client receive msg illegal ", msg.GetID())
+		}
 	}
 }

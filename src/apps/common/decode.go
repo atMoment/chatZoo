@@ -10,7 +10,7 @@ import (
 
 // 解码主要依靠 reflect.Set()
 
-// Decode  解码, 把二进制数据(字节流)转化为具体类型
+// Decode  解码, 把二进制数据(字节流)转化为具体类型 [容器类会先读取长度再读取到容器]
 func Decode(data []byte, obj interface{}) error {
 	// 这里buf只是起辅助作用,提供装字节流的容器
 	buf := bytes.NewBuffer(data)

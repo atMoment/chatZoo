@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// Encode 编码 把对象变成二进制数据(字节流)  [会先把信息长度写入,再写入信息]
+// Encode 编码 把对象变成二进制数据(字节流)  [容器类会先把信息长度写入,再写入信息]
 func Encode(obj interface{}) (int, []byte, error) {
 	buff := new(bytes.Buffer)
 
