@@ -80,13 +80,8 @@ func (c *_Client) receiveFromStdinAndWrite() {
 			}
 			words += v // todo 好像这种写法很消耗,有新的写法
 		}
-		_, buff, err := common.Encode(words)
-		if err != nil {
-			fmt.Printf("words:%v encode err:%v \n", words, err)
-			continue
-		}
 
-		_, err = c.conn.Write(buff)
+		err := common.WriteToConn(c.conn, words)
 		if err != nil {
 			fmt.Println("conn.Write failed ", err)
 			return

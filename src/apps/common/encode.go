@@ -21,7 +21,7 @@ func Encode(obj interface{}) (int, []byte, error) {
 
 func encode(v reflect.Value, buff *bytes.Buffer) error {
 	switch v.Kind() {
-	case reflect.Int32:
+	case reflect.Int32, reflect.Int:
 		writeInt32(int32(v.Int()), buff)
 	case reflect.String:
 		writeString(v.String(), buff)

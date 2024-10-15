@@ -82,17 +82,7 @@ func (s *_Session) replayClient(ctosMsg string) error {
 	} else {
 		stocMsg = fmt.Sprintf("%s = %d", string(ctosMsg), result)
 	}
-	fmt.Println(stocMsg)
-	_, buff, err := common.Encode(stocMsg)
-	if err != nil {
-		fmt.Printf("words:%v encode err:%v \n", stocMsg, err)
-		return ErrDecodeFail
-	}
-	_, err = s.conn.Write(buff)
-	if err != nil {
-		fmt.Println("session handleConnect conn write err ", err)
-		return ErrConnWriteFail
-	}
+	common.WriteToConn(s.conn, stocMsg)
 	return nil
 }
 
