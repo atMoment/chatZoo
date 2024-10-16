@@ -72,18 +72,25 @@ func (s *_Session) procMsg() {
 	case *common.MsgCmdReq:
 		// 注意不要直接使用客户端发的roleID就Add
 		// s.conn.LocalAddr() 这是服务器自己的地址
-		entity, err2 := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn.RemoteAddr().String(), s.conn)
-		if err2 != nil {
-			fmt.Println("session handleConnect AddOrGetEntity err ", err2)
+		entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn.RemoteAddr().String(), s.conn)
+		if entityErr != nil {
+			fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
 			return
 		}
 		v := reflect.ValueOf(entity.role)
 		method := v.MethodByName(m.MethodName)
-		in := make([]reflect.Value, 1)
-		in[0] = reflect.ValueOf(m.Arg)
+		args, unpackErr := common.UnpackArgs(m.Args)
+		if unpackErr != nil {
+			fmt.Println("session handleConnect unpackArgs err ", unpackErr)
+			return
+		}
+		in := make([]reflect.Value, len(args))
+		for i, arg := range args {
+			in[i] = reflect.ValueOf(arg)
+		}
 		method.Call(in)
 	default:
-		fmt.Println("unknow msg ", m)
+		fmt.Println("unknown msg ", m)
 	}
 }
 

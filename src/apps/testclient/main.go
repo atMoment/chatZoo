@@ -2,11 +2,9 @@ package main
 
 import (
 	"ChatZoo/common"
-	"bufio"
+	"ChatZoo/testclient/logic"
 	"fmt"
 	"net"
-	"os"
-	"strings"
 	"sync"
 	"time"
 )
@@ -63,32 +61,14 @@ func main() {
 func (c *_Client) receiveFromStdinAndWrite() {
 	defer func() { c.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
 	for {
-		fmt.Println("已连接计算服务器,请输入你的四则运算公式, 空格分割, \\n 为结束符, 例如 [3 * 3 + 9]")
-		//fmt.Scanln(&word) // 从标准控制中输入,以空格分隔
-		inputReader := bufio.NewReader(os.Stdin)
-		input, inputErr := inputReader.ReadString('\n') // 回车
-		if inputErr != nil {
-			fmt.Println("os.stdin read err ", inputErr)
+		msg := logic.FourOperationCalculate()
+		if msg == nil {
 			continue
-		}
-
-		// 把字符串中的\r\n筛选出来
-		words := ""
-		for _, v := range strings.Split(input, "\r\n") {
-			if v == "\r\n" {
-				break
-			}
-			words += v // todo 好像这种写法很消耗,有新的写法
-		}
-
-		msg := &common.MsgCmdReq{
-			MethodName: "Calculate",
-			Args:       words,
 		}
 		err := common.WriteToConn(c.conn, msg)
 		if err != nil {
 			fmt.Println("conn.Write failed ", err)
-			return
+			continue
 		}
 	}
 }

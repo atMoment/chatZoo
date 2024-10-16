@@ -26,7 +26,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] the value can't be set")
+			return errors.New("[decode] int8 the value can't be set")
 		}
 		v.SetInt(int64(n))
 	case reflect.Uint8:
@@ -35,7 +35,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] the value can't be set")
+			return errors.New("[decode] uint8 the value can't be set")
 		}
 		v.SetUint(uint64(n))
 	case reflect.Int32:
@@ -44,7 +44,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] the value can't be set")
+			return errors.New("[decode] int32 the value can't be set")
 		}
 		v.SetInt(int64(n))
 	case reflect.String:
@@ -53,7 +53,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] the value can't be set")
+			return errors.New("[decode] uint32 the value can't be set")
 		}
 		v.SetString(s)
 	case reflect.Struct:
@@ -64,6 +64,16 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 				return err
 			}
 		}
+	case reflect.Slice:
+		tmp, err := readBytes(buf)
+		if err != nil {
+			return err
+		}
+		if !v.CanSet() {
+			return errors.New("[decode] []byte the value can't be set")
+		}
+		v.SetBytes(tmp)
+
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type ", v.Kind()))
 	}

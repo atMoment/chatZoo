@@ -24,6 +24,10 @@ func (r *Role) JoinRoom(roomID string) {
 
 }
 
+func (r *Role) CreateRoom(roomID string) {
+
+}
+
 func (r *Role) QuitRoom(roomID string) {
 
 }

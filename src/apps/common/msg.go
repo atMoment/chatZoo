@@ -73,18 +73,18 @@ func ReadFromConn(conn net.Conn) (IMessage, error) {
 func WriteToConn(conn net.Conn, msg IMessage) error {
 	_, msgID, err := Encode(msg.GetID())
 	if err != nil {
-		fmt.Printf("WriteToConn failed,  datasize:%v encode err:%v \n", msg.GetID(), err)
+		fmt.Printf("WriteToConn failed, encode msgID:%v err:%v \n", msg.GetID(), err)
 		return ErrEncode
 	}
 
 	dataSize, msgData, err := Encode(msg)
 	if err != nil {
-		fmt.Printf("WriteToConn failed, encode err:%v \n", err)
+		fmt.Printf("WriteToConn failed, encode msg err:%v \n", err)
 		return ErrEncode
 	}
 	_, size, err := Encode(int32(dataSize))
 	if err != nil {
-		fmt.Printf("WriteToConn failed,  datasize:%v encode err:%v \n", dataSize, err)
+		fmt.Printf("WriteToConn failed,  encode data size:%v err:%v \n", dataSize, err)
 		return ErrEncode
 	}
 	allData := make([]byte, 0)

@@ -23,7 +23,7 @@ func PackArgs(args ...interface{}) ([]byte, error) {
 	return s.GetUsedSlice(), nil
 }
 
-// Pack 先把类型写进去, 再把内容写进去
+// Pack 先把类型写进去, 再把内容写进去  需要自动生成这段代码吗？
 func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 	if msg == nil {
 		s.WriteUint8(argTypeNil)
@@ -37,6 +37,30 @@ func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 	case uint8:
 		s.WriteUint8(argTypeUint8)
 		s.WriteUint8(m)
+	case uint16:
+		s.WriteUint8(argTypeUint16)
+		s.WriteUint16(m)
+	case int16:
+		s.WriteUint8(argTypeInt16)
+		s.WriteInt16(m)
+	case uint32:
+		s.WriteUint8(argTypeUint32)
+		s.WriteUint32(m)
+	case int32:
+		s.WriteUint8(argTypeInt32)
+		s.WriteInt32(m)
+	case uint64:
+		s.WriteUint8(argTypeUint64)
+		s.WriteUint64(m)
+	case int64:
+		s.WriteUint8(argTypeInt64)
+		s.WriteInt64(m)
+	case bool:
+		s.WriteUint8(argTypeBool)
+		s.WriteBool(m)
+	case string:
+		s.WriteUint8(argTypeString)
+		s.WriteString(m)
 	default:
 		return errors.New(" pack failed, unsupported type:" + reflect.TypeOf(msg).Name())
 	}
