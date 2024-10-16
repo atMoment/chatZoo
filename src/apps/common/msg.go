@@ -114,11 +114,13 @@ const (
 	MsgID_None = iota
 	MsgID_CmdReq
 	MsgID_CmdRsp
+	MsgID_UserLogin
+	MsgID_UserLogout
 )
 
 type MsgCmdReq struct {
 	MethodName string
-	RoleID     string
+	UserID     string
 	Args       []byte
 }
 
@@ -132,4 +134,22 @@ type MsgCmdRsp struct {
 
 func (m *MsgCmdRsp) GetID() int32 {
 	return MsgID_CmdRsp
+}
+
+type MsgUserLogin struct {
+	UserName  string
+	UserID    string
+	IsVisitor bool // 是否游客
+}
+
+func (m *MsgUserLogin) GetID() int32 {
+	return MsgID_UserLogin
+}
+
+type MsgUserLogout struct {
+	UserID string
+}
+
+func (m *MsgUserLogout) GetID() int32 {
+	return MsgID_UserLogout
 }

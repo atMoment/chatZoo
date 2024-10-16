@@ -71,13 +71,23 @@ func (s *_Session) procMsg() {
 	switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
 	case *common.MsgCmdReq:
 		// 注意不要直接使用客户端发的roleID就Add
-		// s.conn.LocalAddr() 这是服务器自己的地址
-		entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn.RemoteAddr().String(), s.conn)
-		if entityErr != nil {
-			fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-			return
+		// s.conn.LocalAddr() 这是服务器自己的地址  s.conn.RemoteAddr() 是客户端的ip
+		var entity *_UserInfo
+		var entityErr error
+		if m.IsVisitor {
+			entity, entityErr = entityMgr.AddOrGetEntity(m.UserID, s.conn)
+			if entityErr != nil {
+				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+				return
+			}
+		} else {
+			entity, entityErr = entityMgr.GetEntity(m.UserID)
+			if entityErr != nil {
+				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+				return
+			}
 		}
-		v := reflect.ValueOf(entity.role)
+		v := reflect.ValueOf(entity.user)
 		method := v.MethodByName(m.MethodName)
 		args, unpackErr := common.UnpackArgs(m.Args)
 		if unpackErr != nil {
@@ -88,7 +98,35 @@ func (s *_Session) procMsg() {
 		for i, arg := range args {
 			in[i] = reflect.ValueOf(arg)
 		}
-		method.Call(in)
+		method.Call(in) // todo 这是并发不安全的, 需要改一下
+	case *common.MsgUserLogin:
+		if m.IsVisitor { // 游客就用这个, 名字也是这个
+			entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn)
+			if entityErr != nil {
+				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+				return
+			}
+			// 返回给客户端消息
+		}
+		if len(m.UserID) == 0 && len(m.UserName) == 0 {
+			fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+			return
+		}
+		if len(m.UserID) == 0 { // 注册
+			// 生成一个userid, 存到数据库中去, name 作为 unique key, 如果有重复报错
+			entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn)
+			if entityErr != nil {
+				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+				return
+			}
+		} else { // 登录
+			entity, entityErr := entityMgr.GetEntity(m.UserID)
+			if entityErr != nil {
+				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
+				return
+			}
+			// 发消息说上线了, 上线了服务器需要推一些消息什么的, 反正这个时机很重要
+		}
 	default:
 		fmt.Println("unknown msg ", m)
 	}
@@ -106,4 +144,16 @@ func (s *_Session) sendHeartbeat() {
 			s.conn.Write([]byte(data))
 		}
 	}
+}
+
+func (s *_Session) rpcReq() {
+
+}
+
+func (s *_Session) rcpUserLogin() {
+
+}
+
+func (s *_Session) rpcUserLogout() {
+
 }

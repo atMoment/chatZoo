@@ -4,11 +4,11 @@ import (
 	"fmt"
 )
 
-type Role struct {
-	roleID string
+type _User struct {
+	userID string
 }
 
-func (r *Role) Calculate(expression string) {
+func (r *_User) Calculate(expression string) {
 	var ret string
 	result, err := calculate(expression)
 	if err != nil {
@@ -16,22 +16,22 @@ func (r *Role) Calculate(expression string) {
 	} else {
 		ret = fmt.Sprintf("%s = %d", expression, result)
 	}
-	Rpc(r.roleID, ret)
+	RpcToEntity(r.userID, ret)
 	fmt.Printf("Calculate success expression:%v, ret:%v\n ", expression, ret)
 }
 
-func (r *Role) JoinRoom(roomID string) {
+func (r *_User) JoinRoom(roomID string) {
 
 }
 
-func (r *Role) CreateRoom(roomID string) {
+func (r *_User) CreateRoom(roomID string) {
 
 }
 
-func (r *Role) QuitRoom(roomID string) {
+func (r *_User) QuitRoom(roomID string) {
 
 }
 
-func (r *Role) ChatRoom(roomID, content string) {
+func (r *_User) ChatRoom(roomID, content string) {
 
 }
