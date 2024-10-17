@@ -13,13 +13,15 @@ const (
 	CreateRoom    = "1"
 	JoinRoom      = "2"
 	RecommendRoom = "3"
+	ChatRoom      = "4"
 )
 
-func Chat() common.IMessage {
+func Chat(sessionID string) common.IMessage {
 	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
 	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：1 joinroomname \n")
 	fmt.Printf("查看推荐房间请输入 [3] 示例：1 \n")
+	fmt.Printf("查看推荐房间请输入 [4 房间名字 聊天内容] 示例：4 roonname content \n")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
@@ -44,39 +46,55 @@ func Chat() common.IMessage {
 		return nil
 	}
 	var methodName string
-	var arg string
+	var args []byte
+	var err error
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
 		if len(cmds[1]) == 0 {
 			fmt.Println(ModuleName, "创建房间需要输入房间名字")
 			return nil
 		} else {
-			arg = cmds[1]
 			methodName = "CreateRoom"
+			args, err = common.PackArgs(cmds[1])
+			if err != nil {
+				fmt.Println("pack args ", err)
+				return nil
+			}
 		}
 	case JoinRoom:
 		if len(cmds[1]) == 0 {
 			fmt.Println(ModuleName, "加入房间需要输入房间名字")
 			return nil
 		} else {
-			arg = cmds[1]
 			methodName = "JoinRoom"
+			args, err = common.PackArgs(cmds[1])
+			if err != nil {
+				fmt.Println("pack args ", err)
+				return nil
+			}
 		}
 	case RecommendRoom:
 		fmt.Println(ModuleName, "开发中...")
 		return nil
+	case ChatRoom:
+		if len(cmds) == 3 {
+			fmt.Println(ModuleName, "chatroom 参数不对")
+			return nil
+		} else {
+			methodName = "ChatRoom"
+			args, err = common.PackArgs(cmds[1], cmds[2])
+			if err != nil {
+				fmt.Println("pack args ", err)
+				return nil
+			}
+		}
 	default:
 		fmt.Println(ModuleName, " 参数不对 ")
 		return nil
 	}
-
-	args, err := common.PackArgs(arg)
-	if err != nil {
-		fmt.Println("pack args ", err)
-		return nil
-	}
 	msg := &common.MsgCmdReq{
 		MethodName: methodName,
+		UserID:     sessionID,
 		Args:       args,
 	}
 	return msg

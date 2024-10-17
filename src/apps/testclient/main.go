@@ -61,7 +61,7 @@ func main() {
 func (c *_Client) receiveFromStdinAndWrite() {
 	defer func() { c.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
 	for {
-		msg := logic.FourOperationCalculate()
+		msg := logic.Chat(c.conn.LocalAddr().String())
 		if msg == nil {
 			continue
 		}

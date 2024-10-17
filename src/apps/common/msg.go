@@ -137,8 +137,7 @@ func (m *MsgCmdRsp) GetID() int32 {
 }
 
 type MsgUserLogin struct {
-	UserName  string
-	UserID    string
+	OpenID    string
 	IsVisitor bool // 是否游客
 }
 

@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+// s.conn.LocalAddr() 这是服务器自己的地址  s.conn.RemoteAddr() 是客户端的ip
+
 const TickerInterval = 3 * time.Second
 
 var (
@@ -70,63 +72,9 @@ func (s *_Session) procMsg() {
 	}
 	switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
 	case *common.MsgCmdReq:
-		// 注意不要直接使用客户端发的roleID就Add
-		// s.conn.LocalAddr() 这是服务器自己的地址  s.conn.RemoteAddr() 是客户端的ip
-		var entity *_UserInfo
-		var entityErr error
-		if m.IsVisitor {
-			entity, entityErr = entityMgr.AddOrGetEntity(m.UserID, s.conn)
-			if entityErr != nil {
-				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-				return
-			}
-		} else {
-			entity, entityErr = entityMgr.GetEntity(m.UserID)
-			if entityErr != nil {
-				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-				return
-			}
-		}
-		v := reflect.ValueOf(entity.user)
-		method := v.MethodByName(m.MethodName)
-		args, unpackErr := common.UnpackArgs(m.Args)
-		if unpackErr != nil {
-			fmt.Println("session handleConnect unpackArgs err ", unpackErr)
-			return
-		}
-		in := make([]reflect.Value, len(args))
-		for i, arg := range args {
-			in[i] = reflect.ValueOf(arg)
-		}
-		method.Call(in) // todo 这是并发不安全的, 需要改一下
+		s.rpcReq(m)
 	case *common.MsgUserLogin:
-		if m.IsVisitor { // 游客就用这个, 名字也是这个
-			entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn)
-			if entityErr != nil {
-				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-				return
-			}
-			// 返回给客户端消息
-		}
-		if len(m.UserID) == 0 && len(m.UserName) == 0 {
-			fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-			return
-		}
-		if len(m.UserID) == 0 { // 注册
-			// 生成一个userid, 存到数据库中去, name 作为 unique key, 如果有重复报错
-			entity, entityErr := entityMgr.AddOrGetEntity(s.conn.RemoteAddr().String(), s.conn)
-			if entityErr != nil {
-				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-				return
-			}
-		} else { // 登录
-			entity, entityErr := entityMgr.GetEntity(m.UserID)
-			if entityErr != nil {
-				fmt.Println("session handleConnect AddOrGetEntity err ", entityErr)
-				return
-			}
-			// 发消息说上线了, 上线了服务器需要推一些消息什么的, 反正这个时机很重要
-		}
+		s.rpcUserLogin(m)
 	default:
 		fmt.Println("unknown msg ", m)
 	}
@@ -146,14 +94,73 @@ func (s *_Session) sendHeartbeat() {
 	}
 }
 
-func (s *_Session) rpcReq() {
+// 怎么做到客户端等待服务器返回值的？
+// tcp 一来一回的怎么做到等待回的？
 
+func (s *_Session) rpcReq(msg *common.MsgCmdReq) {
+	userID := msg.UserID
+	if len(userID) == 0 {
+		fmt.Println("rpcReq uerID is empty ")
+		return
+	}
+	entity, entityErr := entityMgr.GetEntity(userID)
+	if entityErr != nil {
+		// 报错返回
+		return
+	}
+	v := reflect.ValueOf(entity.user)
+	method := v.MethodByName(msg.MethodName)
+	args, unpackErr := common.UnpackArgs(msg.Args)
+	if unpackErr != nil {
+		fmt.Println("session handleConnect unpackArgs err ", unpackErr)
+		return
+	}
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		in[i] = reflect.ValueOf(arg)
+	}
+	method.Call(in) // todo 这是并发不安全的, 需要改一下
 }
 
-func (s *_Session) rcpUserLogin() {
+func (s *_Session) rpcUserLogin(msg *common.MsgUserLogin) {
+	openID := msg.OpenID
+	if len(openID) == 0 {
+		fmt.Println("rcpUserLogin, openID is empty ")
+		return
+	}
+	// entity 内存中如果在了, 要先销毁后新创建, 因为session肯定不是原来的session 了
+	if msg.IsVisitor {
+		// 查重, 内存中没有这个entity
+		// 不存数据库, 创建一个entity
+		// 成功失败都要返回客户端消息
+		return
+	}
 
+	// 注册
+	// 名字查重, 存db, 有重复的就用userID
+	// 没有重复的就随机生成userID
+	// 创建一个entity ( 查重, userID 有没有重复)
 }
 
-func (s *_Session) rpcUserLogout() {
-
+func (s *_Session) rpcUserLogout(msg *common.MsgUserLogout) {
+	userID := msg.UserID
+	if len(userID) == 0 {
+		// 报错返回
+		return
+	}
+	entityMgr.DeleteEntity(userID)
 }
+
+// 如果客户端断线了, 也相当于玩家下线。 需要实时监控客户端状态
+
+/*
+本期要做的事情有：
+1. 存db
+2. 接收rpc请求并发送回复 怎么做
+3. session层和每一个客户端互通心跳
+4. reflect.Call 并发不安全的, 需要一个并发安全的消息通道
+5. 当有网络消息来的时候, 都是make一个新的[]byte去接收消息, 并发量大的
+   情况下, 垃圾回收很慢, 可能导致短时间内存上涨至宕机。
+   用pool 解决
+6. 聊天逻辑
+*/
