@@ -39,7 +39,7 @@ func Chat(sessionID string) common.IMessage {
 		words += v // todo 好像这种写法很消耗,有新的写法
 	}
 
-	cmds := strings.Split(words, "")
+	cmds := strings.Split(words, " ")
 
 	if len(cmds) == 0 {
 		fmt.Println(ModuleName, " 无有效输入 ")
@@ -77,7 +77,7 @@ func Chat(sessionID string) common.IMessage {
 		fmt.Println(ModuleName, "开发中...")
 		return nil
 	case ChatRoom:
-		if len(cmds) == 3 {
+		if len(cmds) != 3 {
 			fmt.Println(ModuleName, "chatroom 参数不对")
 			return nil
 		} else {

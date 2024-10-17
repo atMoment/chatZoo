@@ -25,6 +25,7 @@ func (mgr *_RoomMgr) AddEntity(userID string) {
 func (mgr *_RoomMgr) AddOrGetEntity(userID string) (*_Room, error) {
 	room := &_Room{
 		createTime: time.Now().UnixNano(),
+		memberList: make(map[string]struct{}),
 	}
 	// 找不到 返回 false
 	entityInfo, ok := mgr.rooms.LoadOrStore(userID, room)
@@ -78,6 +79,6 @@ func (r *_Room) quitRoom(member string) {
 }
 
 func (r *_Room) chat(member, memberName, content string) {
-	m := fmt.Sprintf("%v chat: %v", memberName, content)
+	m := fmt.Sprintf("%v say: %v", member, content)
 	RpcToEntityList(r.memberList, m)
 }

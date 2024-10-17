@@ -58,26 +58,40 @@ func (s *_Session) handleConnect() {
 			fmt.Println("session handleConnect receive exit signal")
 			return
 		default:
-			s.procMsg()
+			err := s.procMsg()
+			if err != nil {
+				return
+			}
 		}
 	}
 }
 
+// readConn 从套接字里持续不断地读
+func (s *_Session) readConn() {
+
+}
+
+// writeConn 从套接字里持续不断地写
+func (s *_Session) writeConn() {
+
+}
+
 // procMsg 处理客户端信息 一直不断使用conn 读并且处理逻辑回复
-func (s *_Session) procMsg() {
+func (s *_Session) procMsg() error {
 	msg, err := common.ReadFromConn(s.conn)
 	if err != nil {
 		fmt.Println("session handleConnect conn read err ", err)
-		return
+		return err
 	}
 	switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
 	case *common.MsgCmdReq:
-		s.rpcReq(m)
+		s.rpcReq(m, s.conn)
 	case *common.MsgUserLogin:
 		s.rpcUserLogin(m)
 	default:
 		fmt.Println("unknown msg ", m)
 	}
+	return nil
 }
 
 // sendHeartbeat 实时给客户端发送心跳, 告诉他我还活着
@@ -97,15 +111,15 @@ func (s *_Session) sendHeartbeat() {
 // 怎么做到客户端等待服务器返回值的？
 // tcp 一来一回的怎么做到等待回的？
 
-func (s *_Session) rpcReq(msg *common.MsgCmdReq) {
+func (s *_Session) rpcReq(msg *common.MsgCmdReq, conn net.Conn) {
 	userID := msg.UserID
 	if len(userID) == 0 {
 		fmt.Println("rpcReq uerID is empty ")
 		return
 	}
-	entity, entityErr := entityMgr.GetEntity(userID)
+	entity, entityErr := entityMgr.AddOrGetEntity(userID, conn)
 	if entityErr != nil {
-		// 报错返回
+		fmt.Println("rpcReq AddOrGetEntity err ", entityErr)
 		return
 	}
 	v := reflect.ValueOf(entity.user)

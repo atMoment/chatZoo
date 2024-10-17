@@ -44,6 +44,6 @@ func (r *_User) ChatRoom(roomID, content string) {
 		fmt.Println("chat get entity err ", err)
 		return
 	}
-	room.chat(r.userID, roomID, content)
+	room.chat(r.userID, r.userID, content)
 	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.userID, roomID, content)
 }
