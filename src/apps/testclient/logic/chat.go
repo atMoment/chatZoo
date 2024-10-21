@@ -9,14 +9,14 @@ import (
 )
 
 const (
-	ModuleName    = "Chat"
-	CreateRoom    = "1"
-	JoinRoom      = "2"
-	RecommendRoom = "3"
-	ChatRoom      = "4"
+	ModuleNameChat = "chat"
+	CreateRoom     = "1"
+	JoinRoom       = "2"
+	RecommendRoom  = "3"
+	ChatRoom       = "4"
 )
 
-func Chat(sessionID string) common.IMessage {
+func Chat(userID string) common.IMessage {
 	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
 	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：1 joinroomname \n")
@@ -26,7 +26,7 @@ func Chat(sessionID string) common.IMessage {
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
-		fmt.Println(ModuleName, " os.stdin read err ", inputErr)
+		fmt.Println(ModuleNameChat, " os.stdin read err ", inputErr)
 		return nil
 	}
 
@@ -42,7 +42,7 @@ func Chat(sessionID string) common.IMessage {
 	cmds := strings.Split(words, " ")
 
 	if len(cmds) == 0 {
-		fmt.Println(ModuleName, " 无有效输入 ")
+		fmt.Println(ModuleNameChat, " 无有效输入 ")
 		return nil
 	}
 	var methodName string
@@ -51,7 +51,7 @@ func Chat(sessionID string) common.IMessage {
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
 		if len(cmds[1]) == 0 {
-			fmt.Println(ModuleName, "创建房间需要输入房间名字")
+			fmt.Println(ModuleNameChat, "创建房间需要输入房间名字")
 			return nil
 		} else {
 			methodName = "CreateRoom"
@@ -63,7 +63,7 @@ func Chat(sessionID string) common.IMessage {
 		}
 	case JoinRoom:
 		if len(cmds[1]) == 0 {
-			fmt.Println(ModuleName, "加入房间需要输入房间名字")
+			fmt.Println(ModuleNameChat, "加入房间需要输入房间名字")
 			return nil
 		} else {
 			methodName = "JoinRoom"
@@ -74,11 +74,11 @@ func Chat(sessionID string) common.IMessage {
 			}
 		}
 	case RecommendRoom:
-		fmt.Println(ModuleName, "开发中...")
+		fmt.Println(ModuleNameChat, "开发中...")
 		return nil
 	case ChatRoom:
 		if len(cmds) != 3 {
-			fmt.Println(ModuleName, "chatroom 参数不对")
+			fmt.Println(ModuleNameChat, "chatroom 参数不对")
 			return nil
 		} else {
 			methodName = "ChatRoom"
@@ -89,12 +89,12 @@ func Chat(sessionID string) common.IMessage {
 			}
 		}
 	default:
-		fmt.Println(ModuleName, " 参数不对 ")
+		fmt.Println(ModuleNameChat, " 参数不对 ")
 		return nil
 	}
 	msg := &common.MsgCmdReq{
 		MethodName: methodName,
-		UserID:     sessionID,
+		UserID:     userID,
 		Args:       args,
 	}
 	return msg

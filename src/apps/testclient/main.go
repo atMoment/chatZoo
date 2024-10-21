@@ -1,12 +1,8 @@
 package main
 
 import (
-	"ChatZoo/common"
-	"ChatZoo/testclient/logic"
 	"fmt"
 	"net"
-	"sync"
-	"time"
 )
 
 /*
@@ -29,64 +25,46 @@ infoBuf := make([]byte, size)
 _, err = io.ReadFull(c.conn, infoBuf)
 */
 
-type _Client struct {
-	conn   net.Conn
-	wg     *sync.WaitGroup
-	ticker *time.Ticker
-}
-
 func main() {
 	conn, err := net.Dial("tcp", "127.0.0.1:7788")
 	if err != nil {
 		fmt.Println("net.Dial err ", err)
 		return
 	}
-	defer conn.Close()
-	fmt.Println("已连接计算服务器,请输入你的四则运算公式, 空格分割, \\n 为结束符, 例如 [3 * 3 + 9]")
 
-	client := &_Client{
-		conn:   conn,
-		wg:     &sync.WaitGroup{},
-		ticker: time.NewTicker(30 * time.Second),
+	user := NewUser(conn)
+	defer user.destroy()
+
+	if !user.login() {
+		fmt.Println("user 登录失败")
+		return
 	}
-	// 试过wg.Add(1) 放到子协程开始, 但是主协程可能等不到子协程开始就执行wg.Wait(),然后就结束程序了
-	client.wg.Add(2)
-	go client.receiveFromStdinAndWrite()
-	go client.read()
-	client.wg.Wait()
-}
-
-// 震惊！ conn直接复制可行
-// receiveFromStdin 持续从标准输入中读取, 并发送给服务器
-func (c *_Client) receiveFromStdinAndWrite() {
-	defer func() { c.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
+	var moduleFunc ModuleFunc
+	var ok bool
 	for {
-		msg := logic.Chat(c.conn.LocalAddr().String())
-		if msg == nil {
-			continue
+		if moduleFunc, ok = moduleFuncList[showGameHall()]; ok {
+			break
 		}
-		err := common.WriteToConn(c.conn, msg)
-		if err != nil {
-			fmt.Println("conn.Write failed ", err)
-			continue
-		}
+		fmt.Println("模块名不对, 请重新输入 ", err)
 	}
+
+	user.play(moduleFunc)
 }
 
-// read 持续从服务器中读取消息
-func (c *_Client) read() {
-	defer func() { c.wg.Done(); fmt.Println(" read over") }()
-	for {
-		msg, err := common.ReadFromConn(c.conn)
-		if err != nil {
-			fmt.Println("common.ReadFromConn err", err)
-			return
-		}
-		switch m := msg.(type) {
-		case *common.MsgCmdRsp:
-			fmt.Println("client read context ", m.Arg)
-		default:
-			fmt.Println("client receive msg illegal ", msg.GetID())
-		}
-	}
+func showGameHall() string {
+	fmt.Println("welcome to chatZoo, this is game hall. we support some game ")
+	fmt.Println("[ > w < ]. [ * v * ]. [ /// - /// ]. [ ` ~ ` ]. [ :) ] ")
+	var moduleName string
+	fmt.Println("[chat] [guess]")
+	fmt.Println("请输入选择的模块")
+	fmt.Scanln(&moduleName)
+	return moduleName
 }
+
+/*
+先登录/游客
+进入游戏大厅
+选择游戏
+退出游戏,回到大厅
+退出账号
+*/

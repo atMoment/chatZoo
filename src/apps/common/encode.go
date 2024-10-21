@@ -21,6 +21,8 @@ func Encode(obj interface{}) (int, []byte, error) {
 
 func encode(v reflect.Value, buff *bytes.Buffer) error {
 	switch v.Kind() {
+	case reflect.Bool:
+		writeBool(v.Bool(), buff)
 	case reflect.Int32, reflect.Int:
 		writeInt32(int32(v.Int()), buff)
 	case reflect.String:
@@ -39,6 +41,28 @@ func encode(v reflect.Value, buff *bytes.Buffer) error {
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type", v.Kind()))
 	}
 	return nil
+}
+
+func writeBool(ok bool, buff *bytes.Buffer) {
+	if ok { // 为真写1, 为0写0
+		writeInt8(1, buff)
+	} else {
+		writeInt8(0, buff)
+	}
+}
+
+func writeInt8(b int8, buff *bytes.Buffer) {
+	buff.WriteByte(byte(b))
+	//buf := make([]byte, 1)
+	//buf[0] = byte(b)
+	//buff.Write(buf)
+}
+
+func writeUint8(b uint8, buff *bytes.Buffer) {
+	buff.WriteByte(byte(b))
+	//buf := make([]byte, 1)
+	//buf[0] = byte(b)
+	//buff.Write(buf)
 }
 
 func writeInt32(b int32, buff *bytes.Buffer) {

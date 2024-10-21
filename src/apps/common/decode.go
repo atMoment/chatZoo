@@ -20,6 +20,15 @@ func Decode(data []byte, obj interface{}) error {
 
 func decode(v reflect.Value, buf *bytes.Buffer) error {
 	switch v.Kind() {
+	case reflect.Bool:
+		n, err := readBool(buf)
+		if err != nil {
+			return err
+		}
+		if !v.CanSet() {
+			return errors.New("[decode] int8 the value can't be set")
+		}
+		v.SetBool(n)
 	case reflect.Int8:
 		n, err := readInt8(buf)
 		if err != nil {
@@ -78,6 +87,17 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type ", v.Kind()))
 	}
 	return nil
+}
+
+func readBool(buf *bytes.Buffer) (bool, error) {
+	n, err := readInt8(buf)
+	if err != nil {
+		return false, err
+	}
+	if n == 1 {
+		return true, nil
+	}
+	return false, nil
 }
 
 func readInt8(buf *bytes.Buffer) (int8, error) {
