@@ -2,6 +2,7 @@ package main
 
 import (
 	"ChatZoo/common"
+	net2 "ChatZoo/common/net"
 	"context"
 	"fmt"
 	"net"
@@ -67,7 +68,7 @@ func (s *_Session) readConn() {
 			fmt.Println("session handleConnect receive exit signal")
 			return
 		default:
-			msg, err := common.ReadFromConn(s.conn)
+			msg, err := net2.ReadFromConn(s.conn)
 			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
 				fmt.Println("session handleConnect conn read err ", err)
 				return

@@ -2,6 +2,7 @@ package main
 
 import (
 	"ChatZoo/common"
+	net2 "ChatZoo/common/net"
 	"fmt"
 	"net"
 	"sync"
@@ -66,6 +67,7 @@ func (u *_User) login() bool {
 		return false
 	}
 	// todo 最好能等到服务器返回结果才算真正登录成功失败, 现在还不知道怎么做！ 开始头痛起来
+	// 假如客户端同时发了两条相同的请求, 服务器也对这两条消息进行了回复, 怎么知道谁是谁的回复。消息有唯一标识吗？
 	fmt.Printf("user login success  openID:%v isVisitor:%v\n", openID, isVisitor)
 	return true
 }
@@ -118,11 +120,11 @@ func (u *_User) receiveLoop() {
 }
 
 func (u *_User) send(msg common.IMessage) error {
-	return common.WriteToConn(u.conn, msg)
+	return net2.WriteToConn(u.conn, msg)
 }
 
 func (u *_User) receive() (common.IMessage, error) {
-	msg, err := common.ReadFromConn(u.conn)
+	msg, err := net2.ReadFromConn(u.conn)
 	if err != nil {
 		fmt.Println("common.ReadFromConn err", err)
 		return nil, err
