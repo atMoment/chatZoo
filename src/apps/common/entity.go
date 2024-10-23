@@ -2,20 +2,20 @@ package common
 
 import "net"
 
-type IEntity interface {
+type IEntityInfo interface {
 	GetNetConn() net.Conn
-	GetID() string
+	GetEntityID() string
 }
 
 type EntityInfo struct {
-	entityID string
-	conn     net.Conn
+	EntityID string
+	Conn     net.Conn
 }
 
 func (e *EntityInfo) GetNetConn() net.Conn {
-	return e.conn
+	return e.Conn
 }
 
-func (e *EntityInfo) GetID() string {
-	return e.entityID
+func (e *EntityInfo) GetEntityID() string {
+	return e.EntityID
 }

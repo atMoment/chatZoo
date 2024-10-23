@@ -6,6 +6,6 @@ import (
 
 func main() {
 	app := NewApp()
-	app.run()
+	app.Run()
 	fmt.Println("server main over")
 }

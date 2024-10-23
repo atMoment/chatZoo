@@ -1,14 +1,25 @@
 package main
 
 import (
+	"ChatZoo/common"
 	"fmt"
+	"net"
 )
 
 type _User struct {
-	userID string
+	common.IEntityInfo
 }
 
-func (r *_User) Calculate(expression string) {
+func NewUser(entityID string, conn net.Conn) *_User {
+	return &_User{
+		&common.EntityInfo{
+			EntityID: entityID,
+			Conn:     conn,
+		},
+	}
+}
+
+func (r *_User) Calculate(expression string) string {
 	var ret string
 	result, err := calculate(expression)
 	if err != nil {
@@ -16,8 +27,8 @@ func (r *_User) Calculate(expression string) {
 	} else {
 		ret = fmt.Sprintf("%s = %d", expression, result)
 	}
-	RpcToEntity(r.userID, ret)
 	fmt.Printf("Calculate success expression:%v, ret:%v\n ", expression, ret)
+	return ret
 }
 
 func (r *_User) JoinRoom(roomID string) {
@@ -26,8 +37,8 @@ func (r *_User) JoinRoom(roomID string) {
 		fmt.Println("chat get entity err ", err)
 		return
 	}
-	room.joinRoom(r.userID)
-	fmt.Printf("Room JoinRoom  userid:%v, roomid:%v \n ", r.userID, roomID)
+	room.joinRoom(r.GetEntityID())
+	fmt.Printf("Room JoinRoom  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
 }
 
 func (r *_User) CreateRoom(roomID string) {
@@ -44,6 +55,6 @@ func (r *_User) ChatRoom(roomID, content string) {
 		fmt.Println("chat get entity err ", err)
 		return
 	}
-	room.chat(r.userID, r.userID, content)
-	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.userID, roomID, content)
+	room.chat(r.GetEntityID(), r.GetEntityID(), content)
+	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), roomID, content)
 }

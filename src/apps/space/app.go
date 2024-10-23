@@ -26,7 +26,7 @@ func NewApp() *_App {
 	return app
 }
 
-func (a *_App) run() {
+func (a *_App) Run() {
 	ln, err := net.Listen("tcp", "127.0.0.1:7788") // 必须外部配置
 	if err != nil {
 		fmt.Println("net listen err ", err)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ChatZoo/common"
 	"errors"
 	"fmt"
 	"sync"
@@ -80,5 +81,5 @@ func (r *_Room) quitRoom(member string) {
 
 func (r *_Room) chat(member, memberName, content string) {
 	m := fmt.Sprintf("%v say: %v", member, content)
-	RpcToEntityList(r.memberList, m)
+	common.DefaultSrvEntity.SendNotifyToEntityList(r.memberList, m)
 }

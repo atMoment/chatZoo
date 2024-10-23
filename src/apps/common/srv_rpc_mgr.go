@@ -11,16 +11,21 @@ import (
 	"time"
 )
 
+type IRpcMgr interface {
+	SendReqToEntity(entityID string, methodName string, methodArgs ...interface{}) chan *_CallRet
+	ReceiveMsg(entityID string, msg mmsg.IMessage) error
+	SendNotifyToEntity(userid string, arg string) error
+	SendNotifyToEntityList(userIds map[string]struct{}, arg ...interface{})
+}
+
 type _RpcMgr struct {
 	IEntityMgr
 	waitRetRpc sync.Map
 	msgIndex   int32
 }
 
-type IRpcMgr interface {
-	EntitySendReq(entityID string, methodName string, methodArgs ...interface{}) chan *_CallRet
-	EntitySendRsp(entityID string, index int32, methodRets ...interface{}) error
-	EntityReceive(entityID string) error
+func (s *_RpcMgr) Start() {
+	fmt.Println("rpc mgr start")
 }
 
 type _CallRet struct {
@@ -31,7 +36,7 @@ type _CallRet struct {
 	Timeout *time.Timer    // 不能无限等待返回
 }
 
-func (s *_RpcMgr) EntitySendReq(entityID string, methodName string, methodArgs ...interface{}) chan *_CallRet {
+func (s *_RpcMgr) SendReqToEntity(entityID string, methodName string, methodArgs ...interface{}) chan *_CallRet {
 	conn, _ := s.getEntityConn(entityID)
 	ret := &_CallRet{
 		Done: make(chan *_CallRet),
@@ -68,7 +73,7 @@ func (s *_RpcMgr) EntitySendReq(entityID string, methodName string, methodArgs .
 	return ret.Done
 }
 
-func (s *_RpcMgr) EntitySendRsp(entityID string, index int32, methodRets ...interface{}) error {
+func (s *_RpcMgr) sendRspToEntity(entityID string, index int32, methodRets ...interface{}) error {
 	conn, _ := s.getEntityConn(entityID)
 	args, err := mmsg.PackArgs(methodRets)
 	if err != nil {
@@ -85,68 +90,6 @@ func (s *_RpcMgr) EntitySendRsp(entityID string, index int32, methodRets ...inte
 	return nil
 }
 
-func (s *_RpcMgr) EntityReceive(entityID string) error {
-	entity, err := s.GetEntity(entityID)
-	if err != nil {
-		return err
-	}
-	conn := entity.GetNetConn()
-	msg, err := mmsg.ReadFromConn(conn)
-	if err != nil {
-		return err
-	}
-	switch m := msg.(type) {
-	case *mmsg.MsgCmdReq:
-		return s.receiveReq(entity, m)
-	case *mmsg.MsgCmdRsp:
-		return s.receiveRsp(m)
-	default:
-		return fmt.Errorf("unspport type:%v", m.GetID())
-	}
-}
-
-func (s *_RpcMgr) getEntityConn(entityID string) (net.Conn, error) {
-	info, err := s.GetEntity(entityID)
-	if err != nil {
-		panic(fmt.Sprintf("entity not exist! %v", entityID))
-	}
-	return info.GetNetConn(), nil
-}
-
-func (s *_RpcMgr) receiveReq(entity interface{}, msg *mmsg.MsgCmdReq) error {
-	v := reflect.ValueOf(entity)
-	method := v.MethodByName(msg.MethodName)
-	args, unpackErr := mmsg.UnpackArgs(msg.Args)
-	if unpackErr != nil {
-		return fmt.Errorf("session handleConnect unpackArgs err :%v", unpackErr)
-	}
-	in := make([]reflect.Value, len(args))
-	for i, arg := range args {
-		in[i] = reflect.ValueOf(arg)
-	}
-	method.Call(in) // todo 这是并发不安全的, 需要改一下
-	return nil
-}
-
-func (s *_RpcMgr) receiveRsp(msg *mmsg.MsgCmdRsp) error {
-	r, ok := s.waitRetRpc.Load(msg.Index)
-	if !ok {
-		return errors.New("过期的回复")
-	}
-	ret, _ := r.(*_CallRet)
-	ret.Timeout.Stop()
-	args, unpackErr := mmsg.UnpackArgs(msg.Rets)
-	if unpackErr != nil {
-		ret.Err = errors.New("unpack arg err")
-	} else {
-		ret.Rets = args
-	}
-
-	ret.Done <- ret
-	close(ret.Done)
-	return nil
-}
-
 func (s *_RpcMgr) SendNotifyToEntity(userid string, arg string) error {
 	entity, err := s.GetEntity(userid)
 	if err != nil {
@@ -159,7 +102,7 @@ func (s *_RpcMgr) SendNotifyToEntity(userid string, arg string) error {
 	msg := &mmsg.MsgNotify{
 		Args: args,
 	}
-	err = mmsg.WriteToConn(entity.conn, msg)
+	err = mmsg.WriteToConn(entity.GetNetConn(), msg)
 	return err
 }
 
@@ -187,7 +130,7 @@ func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, arg ...int
 		}
 		msg := &mmsg.MsgNotify{
 			Args: args}
-		err = mmsg.WriteToConn(info.conn, msg)
+		err = mmsg.WriteToConn(info.GetNetConn(), msg)
 		if err != nil {
 			fmt.Println("RpcToEntityList wrtie conn err ", err)
 		}
@@ -195,4 +138,84 @@ func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, arg ...int
 		return true
 	}
 	s.TravelMgr(f)
+}
+
+func (s *_RpcMgr) ReceiveMsg(entityID string, msg mmsg.IMessage) error {
+	entity, err := s.GetEntity(entityID)
+	if err != nil {
+		return err
+	}
+	switch m := msg.(type) {
+	case *mmsg.MsgCmdReq:
+		rets, reqErr := s.receiveReq(entity, m)
+		if reqErr != nil {
+			return reqErr
+		}
+		rspErr := s.sendRspToEntity(entityID, m.Index, rets...)
+		if rspErr != nil {
+			return rspErr
+		}
+	case *mmsg.MsgCmdRsp:
+		return s.receiveRsp(m)
+	case *mmsg.MsgNotify:
+		return s.receiveNotify(m)
+	default:
+		return fmt.Errorf("unspport type:%v", m.GetID())
+	}
+	return nil
+}
+
+func (s *_RpcMgr) getEntityConn(entityID string) (net.Conn, error) {
+	info, err := s.GetEntity(entityID)
+	if err != nil {
+		panic(fmt.Sprintf("entity not exist! %v", entityID))
+	}
+	return info.GetNetConn(), nil
+}
+
+func (s *_RpcMgr) receiveReq(entity interface{}, msg *mmsg.MsgCmdReq) ([]interface{}, error) {
+	v := reflect.ValueOf(entity)
+	method := v.MethodByName(msg.MethodName)
+	args, unpackErr := mmsg.UnpackArgs(msg.Args)
+	if unpackErr != nil {
+		return nil, fmt.Errorf("session handleConnect unpackArgs err :%v", unpackErr)
+	}
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		in[i] = reflect.ValueOf(arg)
+	}
+	rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
+	out := make([]interface{}, len(rets))
+	for i, ret := range rets {
+		out[i] = reflect.ValueOf(ret)
+	}
+	return out, nil
+}
+
+func (s *_RpcMgr) receiveNotify(msg *mmsg.MsgNotify) error {
+	args, unpackErr := mmsg.UnpackArgs(msg.Args)
+	if unpackErr != nil {
+		return fmt.Errorf("session handleConnect unpackArgs err :%v", unpackErr)
+	}
+	fmt.Println("receiveNotify args ", args)
+	return nil
+}
+
+func (s *_RpcMgr) receiveRsp(msg *mmsg.MsgCmdRsp) error {
+	r, ok := s.waitRetRpc.Load(msg.Index)
+	if !ok {
+		return errors.New("过期的回复")
+	}
+	ret, _ := r.(*_CallRet)
+	ret.Timeout.Stop()
+	args, unpackErr := mmsg.UnpackArgs(msg.Rets)
+	if unpackErr != nil {
+		ret.Err = errors.New("unpack arg err")
+	} else {
+		ret.Rets = args
+	}
+
+	ret.Done <- ret
+	close(ret.Done)
+	return nil
 }

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"ChatZoo/common"
+	mmsg "ChatZoo/common/msg"
 	"ChatZoo/testclient/logic"
 )
 
-type ModuleFunc func(string) common.IMessage
+type ModuleFunc func(string) mmsg.IMessage
 
 var moduleFuncList map[string]ModuleFunc
 

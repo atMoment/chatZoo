@@ -1,8 +1,7 @@
 package main
 
 import (
-	"ChatZoo/common"
-	net2 "ChatZoo/common/net"
+	mmsg "ChatZoo/common/msg"
 	"fmt"
 	"net"
 	"sync"
@@ -59,7 +58,7 @@ func (u *_User) login() bool {
 		fmt.Println("openID is empty ")
 		return false
 	}
-	if err := u.send(&common.MsgUserLogin{
+	if err := u.send(&mmsg.MsgUserLogin{
 		OpenID:    openID,
 		IsVisitor: isVisitor,
 	}); err != nil {
@@ -111,7 +110,7 @@ func (u *_User) receiveLoop() {
 			return
 		}
 		switch m := msg.(type) {
-		case *common.MsgCmdRsp:
+		case *mmsg.MsgCmdRsp:
 			fmt.Println("client read context ", m.Arg)
 		default:
 			fmt.Println("client receive msg illegal ", msg.GetID())
@@ -119,12 +118,12 @@ func (u *_User) receiveLoop() {
 	}
 }
 
-func (u *_User) send(msg common.IMessage) error {
-	return net2.WriteToConn(u.conn, msg)
+func (u *_User) send(msg mmsg.IMessage) error {
+	return mmsg.WriteToConn(u.conn, msg)
 }
 
-func (u *_User) receive() (common.IMessage, error) {
-	msg, err := net2.ReadFromConn(u.conn)
+func (u *_User) receive() (mmsg.IMessage, error) {
+	msg, err := mmsg.ReadFromConn(u.conn)
 	if err != nil {
 		fmt.Println("common.ReadFromConn err", err)
 		return nil, err
