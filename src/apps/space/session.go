@@ -25,25 +25,23 @@ const (
 )
 
 type _Session struct {
-	userID    string
-	conn      net.Conn
-	wg        *sync.WaitGroup // 通知我的父协程我结束了
-	ticker    *time.Ticker
-	ctx       context.Context    // 用于接收父协程结束的信号
-	cancel    context.CancelFunc // 暂时没用
-	receiveCh chan mmsg.IMessage // 套接字收到的消息都放这里
+	user   *_User
+	conn   net.Conn
+	wg     *sync.WaitGroup // 通知我的父协程我结束了
+	ticker *time.Ticker
+	ctx    context.Context    // 用于接收父协程结束的信号
+	cancel context.CancelFunc // 暂时没用
 	//sendCh    chan common.IMessage // 需要往套接字里写的消息都放这里
 }
 
 func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Session {
 	ctx, cancel := context.WithCancel(appCtx)
 	return &_Session{
-		wg:        wg,
-		ctx:       ctx,
-		cancel:    cancel,
-		conn:      conn,
-		ticker:    time.NewTicker(TickerInterval),
-		receiveCh: make(chan mmsg.IMessage, chCacheSize),
+		wg:     wg,
+		ctx:    ctx,
+		cancel: cancel,
+		conn:   conn,
+		ticker: time.NewTicker(TickerInterval),
 		//sendCh:    make(chan common.IMessage, chCacheSize),
 	}
 }
@@ -63,32 +61,30 @@ func (s *_Session) procLoop() {
 
 // readConn 从套接字里持续不断地读
 func (s *_Session) readConn() {
-	defer close(s.receiveCh)
 	for {
 		select {
 		case <-s.ctx.Done():
 			fmt.Println("session handleConnect receive exit signal")
 			return
 		default:
-			msg, err := mmsg.ReadFromConn(s.conn)
-			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
-				fmt.Println("session handleConnect conn read err ", err)
-				return
-			}
-			before := time.Now()
-			switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
-			case *mmsg.MsgUserLogin:
-				s.rpcUserLogin(m)
-			case *mmsg.MsgUserLogout:
-				s.rpcUserLogout()
-			default:
-				if len(s.userID) > 0 {
-					common.DefaultSrvEntity.ReceiveMsg(s.userID, msg) // 我感觉这代码像屎一样...
+			if s.user == nil {
+				msg, err := mmsg.ReadFromConn(s.conn)
+				if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
+					fmt.Println("session handleConnect conn read err ", err)
+					return
 				}
-			}
-			after := time.Now()
-			if after.Sub(before).Milliseconds() > 500 { // 预警 todo 太慢的情况下不能一直卡住。直接把玩家踢了？
-				fmt.Println("procMsg too slow msgID: ", msg.GetID())
+				switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
+				case *mmsg.MsgUserLogin:
+					s.createUser(m) // 这是一条非常特殊的消息
+				default:
+					fmt.Println("unknown msg ", msg.GetID())
+				}
+			} else {
+				err := s.user.GetRpc().ReceiveConn()
+				if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
+					fmt.Println("session handleConnect ReceiveConn ", err)
+					return
+				}
 			}
 		}
 	}
@@ -136,7 +132,7 @@ func (s *_Session) sendHeartbeat() {
 // 怎么做到客户端等待服务器返回值的？
 // tcp 一来一回的怎么做到等待回的？  用channel, 直到回的那条来了才放开
 
-func (s *_Session) rpcUserLogin(msg *mmsg.MsgUserLogin) {
+func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 	openID := msg.OpenID
 	if len(openID) == 0 {
 		fmt.Println("rcpUserLogin, openID is empty ")
@@ -147,8 +143,9 @@ func (s *_Session) rpcUserLogin(msg *mmsg.MsgUserLogin) {
 		// 查重, 内存中没有这个entity
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
-		common.DefaultSrvEntity.AddEntity(openID, NewUser(openID, s.conn))
-		s.userID = openID
+		user := NewUser(openID, s.conn)
+		common.DefaultSrvEntity.AddEntity(openID, user)
+		s.user = user
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 		return
 	}
@@ -157,13 +154,10 @@ func (s *_Session) rpcUserLogin(msg *mmsg.MsgUserLogin) {
 	// 名字查重, 存db, 有重复的就用userID
 	// 没有重复的就随机生成userID
 	// 创建一个entity ( 查重, userID 有没有重复)
-	common.DefaultSrvEntity.AddEntity(openID, NewUser(openID, s.conn))
-	s.userID = openID
+	user := NewUser(openID, s.conn)
+	common.DefaultSrvEntity.AddEntity(openID, user)
+	s.user = user
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
-}
-
-func (s *_Session) rpcUserLogout() {
-	common.DefaultSrvEntity.DeleteEntity(s.userID)
 }
 
 // 如果客户端断线了, 也相当于玩家下线。 需要实时监控客户端状态

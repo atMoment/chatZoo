@@ -74,7 +74,8 @@ func (m *MsgUserLogout) GetID() int32 {
 }
 
 type MsgNotify struct {
-	Args []byte
+	MethodName string
+	Args       []byte
 }
 
 func (m *MsgNotify) GetID() int32 {

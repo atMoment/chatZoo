@@ -1,33 +1,33 @@
-package logic
+package main
 
 import (
-	"ChatZoo/common"
 	"bufio"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 )
 
 const (
-	ModuleNameChat = "chat"
+	ModuleNameChat = "Chat"
 	CreateRoom     = "1"
 	JoinRoom       = "2"
 	RecommendRoom  = "3"
 	ChatRoom       = "4"
 )
 
-func Chat(userID string) common.IMessage {
+func (u *_User) Chat() (string, []interface{}) {
 	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
-	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：1 joinroomname \n")
-	fmt.Printf("查看推荐房间请输入 [3] 示例：1 \n")
-	fmt.Printf("查看推荐房间请输入 [4 房间名字 聊天内容] 示例：4 roonname content \n")
+	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 joinroomname \n")
+	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
+	fmt.Printf("聊天请输入 [4 房间名字 聊天内容] 示例：4 roonname content \n")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
 		fmt.Println(ModuleNameChat, " os.stdin read err ", inputErr)
-		return nil
+		return "", nil
 	}
 
 	// 把字符串中的\r\n筛选出来
@@ -43,61 +43,43 @@ func Chat(userID string) common.IMessage {
 
 	if len(cmds) == 0 {
 		fmt.Println(ModuleNameChat, " 无有效输入 ")
-		return nil
+		return "", nil
 	}
 	var methodName string
-	var args []byte
-	var err error
+	out := make([]interface{}, 0)
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
 		if len(cmds[1]) == 0 {
 			fmt.Println(ModuleNameChat, "创建房间需要输入房间名字")
-			return nil
+			return "", nil
 		} else {
 			methodName = "CreateRoom"
-			args, err = common.PackArgs(cmds[1])
-			if err != nil {
-				fmt.Println("pack args ", err)
-				return nil
-			}
+			out = append(out, reflect.ValueOf(cmds[1]))
 		}
 	case JoinRoom:
 		if len(cmds[1]) == 0 {
 			fmt.Println(ModuleNameChat, "加入房间需要输入房间名字")
-			return nil
+			return "", nil
 		} else {
 			methodName = "JoinRoom"
-			args, err = common.PackArgs(cmds[1])
-			if err != nil {
-				fmt.Println("pack args ", err)
-				return nil
-			}
+			out = append(out, reflect.ValueOf(cmds[1]))
 		}
 	case RecommendRoom:
 		fmt.Println(ModuleNameChat, "开发中...")
-		return nil
+		return "", nil
 	case ChatRoom:
 		if len(cmds) != 3 {
 			fmt.Println(ModuleNameChat, "chatroom 参数不对")
-			return nil
+			return "", nil
 		} else {
 			methodName = "ChatRoom"
-			args, err = common.PackArgs(cmds[1], cmds[2])
-			if err != nil {
-				fmt.Println("pack args ", err)
-				return nil
-			}
+			out = append(out, reflect.ValueOf(cmds[1]), reflect.ValueOf(cmds[2]))
 		}
 	default:
 		fmt.Println(ModuleNameChat, " 参数不对 ")
-		return nil
+		return "", nil
 	}
-	msg := &common.MsgCmdReq{
-		MethodName: methodName,
-		UserID:     userID,
-		Args:       args,
-	}
-	return msg
+	return methodName, out
 }
 
 /*

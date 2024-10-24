@@ -7,16 +7,13 @@ import (
 )
 
 type _User struct {
-	common.IEntityInfo
+	*common.EntityInfo
 }
 
 func NewUser(entityID string, conn net.Conn) *_User {
-	return &_User{
-		&common.EntityInfo{
-			EntityID: entityID,
-			Conn:     conn,
-		},
-	}
+	user := &_User{common.NewEntityInfo(entityID, conn)}
+	user.SetRpc(user)
+	return user
 }
 
 func (r *_User) Calculate(expression string) string {

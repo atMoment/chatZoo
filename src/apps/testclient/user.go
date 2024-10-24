@@ -1,102 +1,82 @@
 package main
 
 import (
-	mmsg "ChatZoo/common/msg"
+	"ChatZoo/common"
 	"fmt"
 	"net"
+	"reflect"
 	"sync"
-	"time"
 )
 
 type _User struct {
-	userID string
-	conn   net.Conn
-	wg     *sync.WaitGroup
-	ticker *time.Ticker
+	wg *sync.WaitGroup
+	common.IEntityInfo
 }
 
-func NewUser(conn net.Conn) *_User {
-	return &_User{
-		conn:   conn,
-		wg:     &sync.WaitGroup{},
-		ticker: time.NewTicker(30 * time.Second),
+func NewUser(entityID string, conn net.Conn) *_User {
+	user := &_User{
+		wg:          &sync.WaitGroup{},
+		IEntityInfo: common.NewEntityInfo(entityID, conn),
 	}
+	user.SetRpc(user)
+	return user
 }
 
-// login 是否登录成功
-func (u *_User) login() bool {
-	var (
-		register = "register"
-		login    = "login"
-		visitor  = "visitor"
-	)
-
-	// Login 登录/注册账号或者游客登录
-	var input, openID string
-	var isVisitor bool
-	fmt.Println("登录账号请输入 login, 注册账号请输入 register, 游客登录请使用 visitor")
-	for {
-		fmt.Scanln(&input)
-		if input == register || input == login || input == visitor {
-			break
-		}
-		fmt.Printf("当前输入为：%v, 此为无效输入,请重新输入\n", input)
-	}
-
-	switch input {
-	case register:
-		fmt.Println("请输入注册的账号名字, 不允许带空格")
-		fmt.Scanln(&openID) // 从标准控制中输入,以空格分隔
-	case login:
-		fmt.Println("请输入登录的账号名字")
-		fmt.Scanln(&openID)
-	case visitor:
-		openID = u.conn.LocalAddr().String()
-		isVisitor = true
-	}
-	if len(openID) == 0 {
-		fmt.Println("openID is empty ")
-		return false
-	}
-	if err := u.send(&mmsg.MsgUserLogin{
-		OpenID:    openID,
-		IsVisitor: isVisitor,
-	}); err != nil {
-		fmt.Println("user login send failed ", err)
-		return false
-	}
-	// todo 最好能等到服务器返回结果才算真正登录成功失败, 现在还不知道怎么做！ 开始头痛起来
-	// 假如客户端同时发了两条相同的请求, 服务器也对这两条消息进行了回复, 怎么知道谁是谁的回复。消息有唯一标识吗？
-	fmt.Printf("user login success  openID:%v isVisitor:%v\n", openID, isVisitor)
-	return true
-}
-
-func (u *_User) play(moduleFunc ModuleFunc) {
+func (u *_User) play() {
 	// 试过wg.Add(1) 放到子协程开始, 但是主协程可能等不到子协程开始就执行wg.Wait(),然后就结束程序了
 	u.wg.Add(2)
 	go u.receiveLoop()
-	go u.sendLoop(moduleFunc)
+	go u.sendLoop()
 	u.wg.Wait()
 }
 
 func (u *_User) destroy() {
-	u.conn.Close()
+	u.GetNetConn().Close()
 }
 
 // 震惊！ conn直接复制可行
 // sendLoop 持续从标准输入中读取, 并发送给服务器
-func (u *_User) sendLoop(moduleFunc ModuleFunc) {
+func (u *_User) sendLoop() {
 	defer func() { u.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
+	// 玩家输入指令
+	var method reflect.Value
 	for {
-		msg := moduleFunc(u.userID)
-		if msg == nil {
+		v := reflect.ValueOf(u)
+		cmd := showGameHall()
+		method = v.MethodByName(cmd)
+
+		if method.Kind() == reflect.Func && !method.IsNil() {
+			break
+		}
+		fmt.Println("模块名不对, 请重新输入 ", cmd)
+	}
+
+	for {
+		args := method.Call([]reflect.Value{})
+		if len(args) == 0 {
+			fmt.Println("methodName empty ")
 			continue
 		}
-		writeErr := u.send(msg)
-		if writeErr != nil {
-			fmt.Println("conn.Write failed ", writeErr)
+		// reflect 全是卡点。 把 reflect.Value 转化成 string
+		methodName := args[0].Interface().(string)
+		if len(methodName) == 0 {
+			fmt.Println("methodName empty ")
 			continue
 		}
+
+		// 将 reflect.Value 还原成实际的类型
+		in := make([]interface{}, len(args)-1)
+		var j int
+		for i := 1; i < len(args); i++ {
+			in[j] = args[i].Interface()
+		}
+		// 想要声明一个函数, 函数的返回值是 ...interface, 方便传入 SendReq中。 返回值是真实的类型而不是 真实类型转化后的interface类型
+		ret := <-u.GetRpc().SendReq(methodName, in...)
+		if ret.Err != nil {
+			fmt.Println("ret.Err  ", ret.Err)
+			continue
+		}
+		fmt.Println("get ret ", ret.Rets)
 	}
 }
 
@@ -104,29 +84,10 @@ func (u *_User) sendLoop(moduleFunc ModuleFunc) {
 func (u *_User) receiveLoop() {
 	defer func() { u.wg.Done(); fmt.Println(" receiveLoop over") }()
 	for {
-		msg, err := u.receive()
+		err := u.GetRpc().ReceiveConn()
 		if err != nil {
 			fmt.Println("common.ReadFromConn err", err)
 			return
 		}
-		switch m := msg.(type) {
-		case *mmsg.MsgCmdRsp:
-			fmt.Println("client read context ", m.Arg)
-		default:
-			fmt.Println("client receive msg illegal ", msg.GetID())
-		}
 	}
-}
-
-func (u *_User) send(msg mmsg.IMessage) error {
-	return mmsg.WriteToConn(u.conn, msg)
-}
-
-func (u *_User) receive() (mmsg.IMessage, error) {
-	msg, err := mmsg.ReadFromConn(u.conn)
-	if err != nil {
-		fmt.Println("common.ReadFromConn err", err)
-		return nil, err
-	}
-	return msg, nil
 }

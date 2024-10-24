@@ -1,6 +1,7 @@
 package main
 
 import (
+	mmsg "ChatZoo/common/msg"
 	"fmt"
 	"net"
 )
@@ -32,33 +33,71 @@ func main() {
 		return
 	}
 
-	user := NewUser(conn)
-	defer user.destroy()
-
-	if !user.login() {
+	user := userLogin(conn)
+	if user == nil {
 		fmt.Println("user 登录失败")
+		conn.Close()
 		return
 	}
-	var moduleFunc ModuleFunc
-	var ok bool
-	for {
-		if moduleFunc, ok = moduleFuncList[showGameHall()]; ok {
-			break
-		}
-		fmt.Println("模块名不对, 请重新输入 ", err)
-	}
-
-	user.play(moduleFunc)
+	defer user.destroy()
+	user.play()
 }
 
 func showGameHall() string {
 	fmt.Println("welcome to chatZoo, this is game hall. we support some game ")
 	fmt.Println("[ > w < ]. [ * v * ]. [ /// - /// ]. [ ` ~ ` ]. [ :) ] ")
 	var moduleName string
-	fmt.Println("[chat] [guess]")
+	fmt.Printf("[%v] [%v]\n", ModuleNameChat, ModuleNameFourOperationCalculate)
 	fmt.Println("请输入选择的模块")
 	fmt.Scanln(&moduleName)
 	return moduleName
+}
+
+func userLogin(conn net.Conn) *_User {
+	var (
+		register = "register"
+		login    = "login"
+		visitor  = "visitor"
+	)
+
+	// Login 登录/注册账号或者游客登录
+	var input, openID string
+	var isVisitor bool
+	fmt.Println("登录账号请输入 login, 注册账号请输入 register, 游客登录请使用 visitor")
+	for {
+		fmt.Scanln(&input)
+		if input == register || input == login || input == visitor {
+			break
+		}
+		fmt.Printf("当前输入为：%v, 此为无效输入,请重新输入\n", input)
+	}
+
+	switch input {
+	case register:
+		fmt.Println("请输入注册的账号名字, 不允许带空格")
+		fmt.Scanln(&openID) // 从标准控制中输入,以空格分隔
+	case login:
+		fmt.Println("请输入登录的账号名字")
+		fmt.Scanln(&openID)
+	case visitor:
+		openID = conn.LocalAddr().String()
+		isVisitor = true
+	}
+	if len(openID) == 0 {
+		fmt.Println("openID is empty ")
+		return nil
+	}
+	if err := mmsg.WriteToConn(conn, &mmsg.MsgUserLogin{
+		OpenID:    openID,
+		IsVisitor: isVisitor,
+	}); err != nil {
+		fmt.Println("user login send failed ", err)
+		return nil
+	}
+	// todo 最好能等到服务器返回结果才算真正登录成功失败, 现在还不知道怎么做！
+	// 假如客户端同时发了两条相同的请求, 服务器也对这两条消息进行了回复, 怎么知道谁是谁的回复。消息有唯一标识吗？
+	fmt.Printf("user login success  openID:%v isVisitor:%v\n", openID, isVisitor)
+	return NewUser(openID, conn)
 }
 
 /*

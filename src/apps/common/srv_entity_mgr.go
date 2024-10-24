@@ -33,7 +33,7 @@ func (mgr *_EntityMgr) AddOrGetEntity(entityID string, entity IEntityInfo) (IEnt
 		return entity, nil
 	}
 
-	ret, transOk := entityInfo.(*EntityInfo)
+	ret, transOk := entityInfo.(IEntityInfo)
 	if !transOk {
 		return nil, errors.New("trans userinfo err")
 	}

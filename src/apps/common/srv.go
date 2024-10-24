@@ -4,6 +4,7 @@ type ISrv interface {
 	IEntityMgr
 	IRpcMgr
 }
+
 type _Srv struct {
 	*_EntityMgr // 可以换成interface
 	*_RpcMgr
@@ -12,5 +13,8 @@ type _Srv struct {
 var DefaultSrvEntity ISrv
 
 func init() {
-	DefaultSrvEntity = &_Srv{}
+	DefaultSrvEntity = &_Srv{
+		&_EntityMgr{},
+		&_RpcMgr{},
+	}
 }

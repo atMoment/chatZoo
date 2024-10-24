@@ -1,7 +1,7 @@
 package msg
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -65,7 +65,7 @@ func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 		s.WriteUint8(argTypeString)
 		s.WriteString(m)
 	default:
-		return errors.New(" pack failed, unsupported type:" + reflect.TypeOf(msg).Name())
+		return fmt.Errorf("pack failed, unsupported type:%v typeName:%v, msg:%v", m, reflect.TypeOf(msg).Name(), m)
 	}
 	return nil
 }
