@@ -99,11 +99,3 @@ func userLogin(conn net.Conn) *_User {
 	fmt.Printf("user login success  openID:%v isVisitor:%v\n", openID, isVisitor)
 	return NewUser(openID, conn)
 }
-
-/*
-先登录/游客
-进入游戏大厅
-选择游戏
-退出游戏,回到大厅
-退出账号
-*/

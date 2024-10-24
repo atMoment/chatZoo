@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 )
 
@@ -16,7 +15,7 @@ const (
 	ChatRoom       = "4"
 )
 
-func (u *_User) Chat() (string, []interface{}) {
+func (u *_User) Chat() (string, string) {
 	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
 	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 joinroomname \n")
@@ -27,7 +26,7 @@ func (u *_User) Chat() (string, []interface{}) {
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
 		fmt.Println(ModuleNameChat, " os.stdin read err ", inputErr)
-		return "", nil
+		return "", ""
 	}
 
 	// 把字符串中的\r\n筛选出来
@@ -41,45 +40,29 @@ func (u *_User) Chat() (string, []interface{}) {
 
 	cmds := strings.Split(words, " ")
 
-	if len(cmds) == 0 {
-		fmt.Println(ModuleNameChat, " 无有效输入 ")
-		return "", nil
+	if len(cmds) != 2 {
+		fmt.Println(ModuleNameChat, " 无有效输入, 长度不对 ", len(cmds))
+		return "", ""
 	}
 	var methodName string
-	out := make([]interface{}, 0)
+	var ret string
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
-		if len(cmds[1]) == 0 {
-			fmt.Println(ModuleNameChat, "创建房间需要输入房间名字")
-			return "", nil
-		} else {
-			methodName = "CreateRoom"
-			out = append(out, reflect.ValueOf(cmds[1]))
-		}
+		methodName = "CreateRoom"
 	case JoinRoom:
-		if len(cmds[1]) == 0 {
-			fmt.Println(ModuleNameChat, "加入房间需要输入房间名字")
-			return "", nil
-		} else {
-			methodName = "JoinRoom"
-			out = append(out, reflect.ValueOf(cmds[1]))
-		}
+		methodName = "JoinRoom"
+		u.joinRoomID = cmds[1]
 	case RecommendRoom:
 		fmt.Println(ModuleNameChat, "开发中...")
-		return "", nil
+		return "", ""
 	case ChatRoom:
-		if len(cmds) != 3 {
-			fmt.Println(ModuleNameChat, "chatroom 参数不对")
-			return "", nil
-		} else {
-			methodName = "ChatRoom"
-			out = append(out, reflect.ValueOf(cmds[1]), reflect.ValueOf(cmds[2]))
-		}
+		methodName = "ChatRoom"
 	default:
 		fmt.Println(ModuleNameChat, " 参数不对 ")
-		return "", nil
+		return "", ""
 	}
-	return methodName, out
+	ret = cmds[1]
+	return methodName, ret
 }
 
 /*

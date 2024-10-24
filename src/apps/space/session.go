@@ -159,17 +159,3 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 	s.user = user
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 }
-
-// 如果客户端断线了, 也相当于玩家下线。 需要实时监控客户端状态
-
-/*
-本期要做的事情有：
-1. 存db
-2. 接收rpc请求并发送回复 怎么做
-3. session层和每一个客户端互通心跳
-4. reflect.Call 并发不安全的, 需要一个并发安全的消息通道   ok (整了一个channel保证顺序)
-5. 当有网络消息来的时候, 都是make一个新的[]byte去接收消息, 并发量大的
-   情况下, 垃圾回收很慢, 可能导致短时间内存上涨至宕机。
-   用pool 解决
-6. 聊天逻辑
-*/

@@ -169,13 +169,13 @@ func (s *_EntityRpc) receiveReq(msg *mmsg.MsgCmdReq) error {
 	rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
 	out := make([]interface{}, len(rets))
 	for i, ret := range rets {
-		out[i] = reflect.ValueOf(ret)
+		out[i] = ret.Interface()
 	}
 	return s.sendRsp(msg.Index, out...)
 }
 
 func (s *_EntityRpc) sendRsp(index int32, methodRets ...interface{}) error {
-	args, err := mmsg.PackArgs(methodRets)
+	args, err := mmsg.PackArgs(methodRets...)
 	if err != nil {
 		return fmt.Errorf("pack rets err %v", err)
 	}
