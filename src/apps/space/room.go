@@ -81,5 +81,5 @@ func (r *_Room) quitRoom(member string) {
 
 func (r *_Room) chat(member, memberName, content string) {
 	m := fmt.Sprintf("%v say: %v", member, content)
-	common.DefaultSrvEntity.SendNotifyToEntityList(r.memberList, m)
+	common.DefaultSrvEntity.SendNotifyToEntityList(r.memberList, "Notify_SToCMessage", m)
 }

@@ -5,14 +5,18 @@ import (
 )
 
 type IRpcMgr interface {
-	SendNotifyToEntityList(userIds map[string]struct{}, arg ...interface{})
+	SendNotifyToEntityList(userIds map[string]struct{}, methodName string, arg ...interface{})
 }
 
 type _RpcMgr struct {
 	IEntityMgr
 }
 
-func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, arg ...interface{}) {
+func NewRpcMgr(entityMgr IEntityMgr) *_RpcMgr {
+	return &_RpcMgr{entityMgr}
+}
+
+func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, methodName string, arg ...interface{}) {
 	f := func(key, value any) bool {
 		id, keyOk := key.(string)
 		if !keyOk {
@@ -29,7 +33,7 @@ func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, arg ...int
 			fmt.Println("RpcToEntityList value not _EntityInfo")
 			return false
 		}
-		entity.GetRpc().SendNotify(arg...)
+		entity.GetRpc().SendNotify(methodName, arg...)
 		return true
 	}
 	s.TravelMgr(f)

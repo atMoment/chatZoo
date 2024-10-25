@@ -13,8 +13,9 @@ type _Srv struct {
 var DefaultSrvEntity ISrv
 
 func init() {
-	DefaultSrvEntity = &_Srv{
-		&_EntityMgr{},
-		&_RpcMgr{},
+	srv := &_Srv{
+		_EntityMgr: NewEntityMgr(),
 	}
+	srv._RpcMgr = NewRpcMgr(srv._EntityMgr)
+	DefaultSrvEntity = srv
 }
