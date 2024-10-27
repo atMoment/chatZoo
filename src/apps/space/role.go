@@ -10,10 +10,15 @@ type _User struct {
 	*common.EntityInfo
 }
 
-func NewUser(entityID string, conn net.Conn) *_User {
+func NewUser(entityID string, conn net.Conn) (*_User, error) {
+	err := insertUser(entityID, []byte{})
+	if err != nil {
+		return nil, err
+	}
 	user := &_User{common.NewEntityInfo(entityID, conn)}
 	user.SetRpc(user)
-	return user
+
+	return user, nil
 }
 
 func (r *_User) Calculate(expression string) string {

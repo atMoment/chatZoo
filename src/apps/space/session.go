@@ -143,7 +143,11 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 		// 查重, 内存中没有这个entity
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
-		user := NewUser(openID, s.conn)
+		user, err := NewUser(openID, s.conn)
+		if err != nil {
+			fmt.Println("new user err ", err)
+			return
+		}
 		common.DefaultSrvEntity.AddEntity(openID, user)
 		s.user = user
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
@@ -154,7 +158,11 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 	// 名字查重, 存db, 有重复的就用userID
 	// 没有重复的就随机生成userID
 	// 创建一个entity ( 查重, userID 有没有重复)
-	user := NewUser(openID, s.conn)
+	user, err := NewUser(openID, s.conn)
+	if err != nil {
+		fmt.Println("new user err ", err)
+		return
+	}
 	common.DefaultSrvEntity.AddEntity(openID, user)
 	s.user = user
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)

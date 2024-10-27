@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql" // 这个非常重要！ 否则 sql.Open 会出错
 	"time"
 )
 
@@ -12,7 +13,11 @@ type _StoreUtil struct {
 	storeCmdTimeout time.Duration
 }
 
-type IStoreUtil interface{}
+type IStoreUtil interface {
+	GetCmdTimeout() time.Duration
+	GetSqlDB() *sql.DB
+	GetConn(ctx context.Context) *sql.Conn
+}
 
 const (
 	MysqlDataBase      = "game" //"happytest" //数据库名字
@@ -29,7 +34,7 @@ const (
 	MysqlTestTbl = "tbl_union"
 )
 
-func NewDefaultStoreUtil() (*_StoreUtil, error) {
+func NewDefaultStoreUtil() (IStoreUtil, error) {
 	return NewStoreUtil(MysqlUser, MysqlPwd, MysqlAddr, MysqlDataBase, MysqlCmdTimeoutSec)
 }
 
