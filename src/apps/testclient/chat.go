@@ -20,7 +20,7 @@ func (u *_User) Chat() (string, string) {
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
 	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 joinroomname \n")
 	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
-	fmt.Printf("聊天请输入 [4 房间名字 聊天内容] 示例：4 roonname content \n")
+	fmt.Printf("聊天请输入 [4 聊天内容] 示例：4 content \n")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
@@ -51,7 +51,6 @@ func (u *_User) Chat() (string, string) {
 		methodName = "CreateRoom"
 	case JoinRoom:
 		methodName = "JoinRoom"
-		u.joinRoomID = cmds[1]
 	case RecommendRoom:
 		fmt.Println(ModuleNameChat, "开发中...")
 		return "", ""
@@ -63,6 +62,12 @@ func (u *_User) Chat() (string, string) {
 	}
 	ret = cmds[1]
 	return methodName, ret
+}
+
+//////////////     接收服务器回调函数    //////////////
+
+func (r *_User) Notify_SToCMessage(msg string) {
+	fmt.Println("receive msg ", msg)
 }
 
 /*

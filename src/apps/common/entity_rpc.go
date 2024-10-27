@@ -11,7 +11,7 @@ import (
 )
 
 type IEntityRpc interface {
-	SendNotify(arg ...interface{}) error
+	SendNotify(methodName string, arg ...interface{}) error
 	SendReq(methodName string, methodArgs ...interface{}) chan *_CallRet
 	ReceiveConn() error
 }
@@ -36,13 +36,14 @@ type _CallRet struct {
 	Timeout *time.Timer    // 不能无限等待返回
 }
 
-func (s *_EntityRpc) SendNotify(arg ...interface{}) error {
+func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
 	args, err := mmsg.PackArgs(arg...)
 	if err != nil {
 		return fmt.Errorf("pack rets err %v", err)
 	}
 	msg := &mmsg.MsgNotify{
-		Args: args,
+		MethodName: methodName,
+		Args:       args,
 	}
 	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
 	return err
@@ -140,6 +141,10 @@ func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 func (s *_EntityRpc) receiveNotify(msg *mmsg.MsgNotify) error {
 	v := reflect.ValueOf(s.entity)
 	method := v.MethodByName(msg.MethodName)
+	if method.Kind() != reflect.Func || method.IsNil() {
+		return fmt.Errorf("can't find methodName %v", msg.MethodName)
+	}
+
 	args, unpackErr := mmsg.UnpackArgs(msg.Args)
 	if unpackErr != nil {
 		return fmt.Errorf("session handleConnect unpackArgs err :%v", unpackErr)

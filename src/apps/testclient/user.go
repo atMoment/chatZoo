@@ -11,7 +11,6 @@ import (
 type _User struct {
 	wg *sync.WaitGroup
 	common.IEntityInfo
-	joinRoomID string
 }
 
 func NewUser(entityID string, conn net.Conn) *_User {

@@ -18,6 +18,10 @@ type _EntityMgr struct {
 	entityList sync.Map // key: entityID  val: EntityInfo
 }
 
+func NewEntityMgr() *_EntityMgr {
+	return &_EntityMgr{}
+}
+
 func (mgr *_EntityMgr) Start() {
 	fmt.Println("entity mgr start")
 }

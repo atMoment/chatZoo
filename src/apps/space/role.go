@@ -8,14 +8,17 @@ import (
 
 type _User struct {
 	*common.EntityInfo
+	joinRoomID string
 }
+
 
 func NewUser(entityID string, conn net.Conn) (*_User, error) {
 	err := insertUser(entityID, []byte{})
 	if err != nil {
 		return nil, err
 	}
-	user := &_User{common.NewEntityInfo(entityID, conn)}
+	
+	user := &_User{EntityInfo: common.NewEntityInfo(entityID, conn)}
 	user.SetRpc(user)
 
 	return user, nil
@@ -33,14 +36,17 @@ func (r *_User) Calculate(expression string) string {
 	return ret
 }
 
-func (r *_User) JoinRoom(roomID string) {
+
+func (r *_User) JoinRoom(roomID string) string {
 	room, err := roomMgr.AddOrGetEntity(roomID)
 	if err != nil {
 		fmt.Println("chat get entity err ", err)
-		return
+		return "failed"
 	}
 	room.joinRoom(r.GetEntityID())
+	r.joinRoomID = roomID
 	fmt.Printf("Room JoinRoom  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
+	return "success"
 }
 
 func (r *_User) CreateRoom(roomID string) {
@@ -51,12 +57,18 @@ func (r *_User) QuitRoom(roomID string) {
 
 }
 
-func (r *_User) ChatRoom(roomID, content string) {
-	room, err := roomMgr.AddOrGetEntity(roomID)
+
+func (r *_User) ChatRoom(content string) string {
+	if len(r.joinRoomID) == 0 {
+		return "ChatRoom failed, roomID is empty"
+	}
+	room, err := roomMgr.AddOrGetEntity(r.joinRoomID)
 	if err != nil {
 		fmt.Println("chat get entity err ", err)
-		return
+		
+		return "ChatRoom failed"
 	}
 	room.chat(r.GetEntityID(), r.GetEntityID(), content)
-	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), roomID, content)
+	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), r.joinRoomID, content)
+	return "ChatRoom success"
 }
