@@ -68,20 +68,24 @@ func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan 
 		Args:       args,
 		Index:      index,
 	}
-	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
-	if err != nil {
-		ret.Err = errors.New("write to conn err " + err.Error())
-		ret.Done <- ret
-		close(ret.Done)
-		return ret.Done
-	}
+
 	ret.Timeout = time.AfterFunc(3*time.Second, func() {
 		s.waitRetRpc.Delete(index)
 		ret.Err = errors.New("over time")
 		ret.Done <- ret
 		close(ret.Done)
 	})
+	// 先存再发送套接字, 收rsp是另外的协程, 防止收rsp时在store的前面,这样就找不到了
 	s.waitRetRpc.Store(index, ret)
+
+	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
+	if err != nil {
+		s.waitRetRpc.Delete(index)
+		ret.Err = errors.New("write to conn err " + err.Error())
+		ret.Done <- ret
+		close(ret.Done)
+		return ret.Done
+	}
 	return ret.Done
 }
 

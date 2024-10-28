@@ -67,24 +67,24 @@ func (s *_Session) readConn() {
 			fmt.Println("session handleConnect receive exit signal")
 			return
 		default:
-			if s.user == nil {
-				msg, err := mmsg.ReadFromConn(s.conn)
-				if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
-					fmt.Println("session handleConnect conn read err ", err)
-					return
-				}
-				switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
-				case *mmsg.MsgUserLogin:
-					s.createUser(m) // 这是一条非常特殊的消息
-				default:
-					fmt.Println("unknown msg ", msg.GetID())
-				}
-			} else {
-				err := s.user.GetRpc().ReceiveConn()
-				if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
-					fmt.Println("session handleConnect ReceiveConn ", err)
-					return
-				}
+		}
+		if s.user == nil {
+			msg, err := mmsg.ReadFromConn(s.conn)
+			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
+				fmt.Println("session handleConnect conn read err ", err)
+				return
+			}
+			switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
+			case *mmsg.MsgUserLogin:
+				s.createUser(m) // 这是一条非常特殊的消息
+			default:
+				fmt.Println("unknown msg ", msg.GetID())
+			}
+		} else {
+			err := s.user.GetRpc().ReceiveConn()
+			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
+				fmt.Println("session handleConnect ReceiveConn ", err)
+				return
 			}
 		}
 	}
