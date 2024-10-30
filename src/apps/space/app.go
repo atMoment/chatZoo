@@ -8,6 +8,16 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
+)
+
+const (
+	GateListenAddr = "127.0.0.1:7788"
+
+	redisAddr          = "127.0.0.1:6379"
+	redisPassword      = ""
+	redisDB            = 8
+	redisCmdTimeoutSec = 3 * time.Second // redis 操作超时时间
 )
 
 type _App struct {
@@ -27,7 +37,7 @@ func NewApp() *_App {
 }
 
 func (a *_App) Run() {
-	ln, err := net.Listen("tcp", "127.0.0.1:7788") // 必须外部配置
+	ln, err := net.Listen("tcp", GateListenAddr) // 必须外部配置
 	if err != nil {
 		fmt.Println("net listen err ", err)
 		return

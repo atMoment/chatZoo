@@ -1,9 +1,11 @@
 package main
 
 import (
+	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
 	"fmt"
 	"net"
+	"time"
 )
 
 /*
@@ -51,6 +53,19 @@ func showGameHall() string {
 	fmt.Println("请输入选择的模块")
 	fmt.Scanln(&moduleName)
 	return moduleName
+}
+
+func httpUserLogin() {
+	url := "http://127.0.0.1:6670" + "/login"
+	req := login.LoginReq{
+		Name:     "monitor 送信",
+		From:     "神",
+		Content:  time.Now().String(),
+		Target:   "2119601",
+		MailType: MailTypePrivate,
+	}
+	resp := login.LoginResp{}
+
 }
 
 func userLogin(conn net.Conn) *_User {

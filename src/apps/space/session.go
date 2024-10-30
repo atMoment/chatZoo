@@ -2,6 +2,8 @@ package main
 
 import (
 	"ChatZoo/common"
+	"ChatZoo/common/db"
+	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
 	"context"
 	"fmt"
@@ -25,18 +27,19 @@ const (
 )
 
 type _Session struct {
-	user   *_User
-	conn   net.Conn
-	wg     *sync.WaitGroup // 通知我的父协程我结束了
-	ticker *time.Ticker
-	ctx    context.Context    // 用于接收父协程结束的信号
-	cancel context.CancelFunc // 暂时没用
+	user      *_User
+	conn      net.Conn
+	wg        *sync.WaitGroup // 通知我的父协程我结束了
+	ticker    *time.Ticker
+	ctx       context.Context    // 用于接收父协程结束的信号
+	cancel    context.CancelFunc // 暂时没用
+	cacheUtil db.ICacheUtil
 	//sendCh    chan common.IMessage // 需要往套接字里写的消息都放这里
 }
 
 func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Session {
 	ctx, cancel := context.WithCancel(appCtx)
-	return &_Session{
+	s := &_Session{
 		wg:     wg,
 		ctx:    ctx,
 		cancel: cancel,
@@ -44,6 +47,13 @@ func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Ses
 		ticker: time.NewTicker(TickerInterval),
 		//sendCh:    make(chan common.IMessage, chCacheSize),
 	}
+
+	cacheUtil, err := db.NewCacheUtil(redisAddr, redisPassword, redisDB, redisCmdTimeoutSec)
+	if err != nil {
+		panic(err)
+	}
+	s.cacheUtil = cacheUtil
+	return s
 }
 
 func (s *_Session) procLoop() {
@@ -138,14 +148,20 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 		fmt.Println("rcpUserLogin, openID is empty ")
 		return
 	}
+	_, err := login.VerifyLoginToken(s.cacheUtil, msg.PublicKey)
+	if err != nil {
+		fmt.Println("rcpUserLogin, publicKey not match  ", err)
+		return
+	}
+	// todo 后续的消息用这个加密解密   login消息不加密吗？
 	// entity 内存中如果在了, 要先销毁后新创建, 因为session肯定不是原来的session 了
 	if msg.IsVisitor {
 		// 查重, 内存中没有这个entity
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
-		user, err := NewUser(openID, s.conn)
-		if err != nil {
-			fmt.Println("new user err ", err)
+		user, err2 := NewUser(openID, s.conn)
+		if err2 != nil {
+			fmt.Println("new user err ", err2)
 			return
 		}
 		common.DefaultSrvEntity.AddEntity(openID, user)

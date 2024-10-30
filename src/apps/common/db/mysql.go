@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+/*
+最主要代码在于
+sqlDB, err := sql.Open("mysql", url)
+
+*/
+
 type _StoreUtil struct {
 	storeDB         *sql.DB
 	storeCmdTimeout time.Duration
@@ -17,28 +23,21 @@ type IStoreUtil interface {
 	GetCmdTimeout() time.Duration
 	GetSqlDB() *sql.DB
 	GetConn(ctx context.Context) *sql.Conn
+
+	// 感觉不是很能成为接口？
+
+	InsertData(sqlStr string, args ...interface{}) error
+	SelectData(sqlStr string, element interface{}, args ...interface{}) error
 }
 
 const (
-	MysqlDataBase      = "game" //"happytest" //数据库名字
-	MysqlUser          = "root"
-	MysqlPwd           = "111111"
-	MysqlAddr          = "127.0.0.1:3306"
-	MysqlCmdTimeoutSec = 3 * time.Second
-
 	mysqlMaxPoolSize = 64               // 可有可无
 	mysqlMinPoolSize = 32               // 可有可无
 	mysqlMaxIdleTime = 30 * time.Second // 可有可无
 	mysqlMaxLiftTime = 0 * time.Second  // 可有可无
-
-	MysqlTestTbl = "tbl_union"
 )
 
-func NewDefaultStoreUtil() (IStoreUtil, error) {
-	return NewStoreUtil(MysqlUser, MysqlPwd, MysqlAddr, MysqlDataBase, MysqlCmdTimeoutSec)
-}
-
-func NewStoreUtil(mysqlUser, mysqlPwd, mysqlAddr, mysqlDataBase string, mysqlCmdTimeoutSec time.Duration) (*_StoreUtil, error) {
+func NewStoreUtil(mysqlUser, mysqlPwd, mysqlAddr, mysqlDataBase string, mysqlCmdTimeoutSec time.Duration) (IStoreUtil, error) {
 	if mysqlCmdTimeoutSec == 0 {
 		panic("NewStoreUtil mysqlCmdTimeoutSec is 0")
 	}
@@ -90,4 +89,28 @@ func (u *_StoreUtil) GetConn(ctx context.Context) *sql.Conn {
 		return nil
 	}
 	return conn
+}
+
+func (u *_StoreUtil) InsertData(sqlStr string, args ...interface{}) error {
+	ctx, _ := context.WithTimeout(context.Background(), u.GetCmdTimeout())
+	conn := u.GetConn(ctx)
+	defer conn.Close()
+	_, err := conn.ExecContext(ctx, sqlStr, args...)
+	return err
+}
+
+func (u *_StoreUtil) SelectData(sqlStr string, element interface{}, args ...interface{}) error {
+	ctx, _ := context.WithTimeout(context.Background(), u.GetCmdTimeout())
+	conn := u.GetConn(ctx)
+	defer conn.Close()
+
+	row := conn.QueryRowContext(ctx, sqlStr, args...)
+	if row.Err() != nil {
+		return row.Err()
+	}
+	err := row.Scan(element)
+	if err != nil {
+		return err
+	}
+	return nil
 }

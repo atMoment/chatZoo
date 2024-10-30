@@ -59,6 +59,7 @@ func (m *MsgCmdRsp) GetID() int32 {
 type MsgUserLogin struct {
 	OpenID    string
 	IsVisitor bool // 是否游客
+	PublicKey string
 }
 
 func (m *MsgUserLogin) GetID() int32 {
