@@ -18,18 +18,6 @@ func NewUser(entityID string, conn net.Conn) (*_User, error) {
 	return user, nil
 }
 
-func (r *_User) Calculate(expression string) string {
-	var ret string
-	result, err := calculate(expression)
-	if err != nil {
-		ret = fmt.Sprintf("session server calculate, err:%v", err)
-	} else {
-		ret = fmt.Sprintf("%s = %d", expression, result)
-	}
-	fmt.Printf("Calculate success expression:%v, ret:%v\n ", expression, ret)
-	return ret
-}
-
 func (r *_User) JoinRoom(roomID string) string {
 	room, err := roomMgr.AddOrGetEntity(roomID)
 	if err != nil {

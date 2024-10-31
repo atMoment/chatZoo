@@ -20,7 +20,7 @@ DROP TABLE IF EXISTS `User`;
 
 CREATE TABLE `User`  (
 
-    `ID` char(24) NOT NULL,
+    `ID` char(16) NOT NULL,
 
     `Data` mediumblob NULL,
 	

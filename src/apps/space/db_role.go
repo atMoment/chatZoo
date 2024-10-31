@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"ChatZoo/common/db"
 	"context"
@@ -75,3 +76,4 @@ func getUserData(id string) ([]byte, error) {
 
 	return userData, nil
 }
+*/

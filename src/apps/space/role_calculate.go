@@ -7,6 +7,18 @@ import (
 	"strings"
 )
 
+func (r *_User) Calculate(expression string) string {
+	var ret string
+	result, err := calculate(expression)
+	if err != nil {
+		ret = fmt.Sprintf("session server calculate, err:%v", err)
+	} else {
+		ret = fmt.Sprintf("%s = %d", expression, result)
+	}
+	fmt.Printf("Calculate success expression:%v, ret:%v\n ", expression, ret)
+	return ret
+}
+
 func calculate(s string) (int, error) {
 	operatorList, factorList, err := analysisInput(s)
 	if err != nil {

@@ -20,6 +20,7 @@ func init() {
 	AllMsgMap[MsgID_CmdReq] = &MsgCmdReq{}
 	AllMsgMap[MsgID_CmdRsp] = &MsgCmdRsp{}
 	AllMsgMap[MsgID_UserLogin] = &MsgUserLogin{}
+	AllMsgMap[MsgID_UserLoginResp] = &MsgUserLoginResp{}
 	AllMsgMap[MsgID_UserLogout] = &MsgUserLogout{}
 	AllMsgMap[MsgID_Notify] = &MsgNotify{}
 }
@@ -33,6 +34,7 @@ const (
 	MsgID_CmdReq
 	MsgID_CmdRsp
 	MsgID_UserLogin
+	MsgID_UserLoginResp
 	MsgID_UserLogout
 	MsgID_Notify
 )
@@ -58,12 +60,20 @@ func (m *MsgCmdRsp) GetID() int32 {
 
 type MsgUserLogin struct {
 	OpenID    string
-	IsVisitor bool // 是否游客
-	PublicKey string
+	IsVisitor bool   // 是否游客
+	PublicKey string // 客户端公钥
 }
 
 func (m *MsgUserLogin) GetID() int32 {
 	return MsgID_UserLogin
+}
+
+type MsgUserLoginResp struct {
+	Err string // 错误为nil 表示成功, 不为nil 表示失败
+}
+
+func (m *MsgUserLoginResp) GetID() int32 {
+	return MsgID_UserLoginResp
 }
 
 type MsgUserLogout struct {

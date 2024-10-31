@@ -1,5 +1,7 @@
 package login
 
+// login 服和gate服需要用到里面的函数
+
 import (
 	"ChatZoo/common/db"
 	"errors"
@@ -18,6 +20,9 @@ func SaveLoginToken(cacheUtil db.ICacheUtil, clientPublicKey string, communicati
 }
 
 func VerifyLoginToken(cacheUtil db.ICacheUtil, clientPublicKey string) (string, error) {
+	if len(clientPublicKey) == 0 {
+		return "", errors.New("client public key is empty")
+	}
 	ret, err := cacheUtil.Get(redisTableCommunicationKey)
 	if err != nil {
 		return "", err
