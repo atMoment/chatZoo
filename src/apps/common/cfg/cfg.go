@@ -5,6 +5,7 @@ package cfg
 // 先暂时这么地
 
 type IChatZooServerConfig interface {
+	GetAppOuterAddr(typ string) string
 	GetAppListenAddr(typ string) string
 	GetAppPProfAddr(typ string) string
 	GetMysqlCfg() MysqlConfig
@@ -23,6 +24,14 @@ func (c *_ChatZooServerConfig) GetAppListenAddr(typ string) string {
 		panic("this typ not config")
 	}
 	return info.ListenAddr
+}
+
+func (c *_ChatZooServerConfig) GetAppOuterAddr(typ string) string {
+	info, ok := c.App[typ]
+	if !ok {
+		panic("this typ not config")
+	}
+	return info.OuterAddr
 }
 
 func (c *_ChatZooServerConfig) GetAppPProfAddr(typ string) string {

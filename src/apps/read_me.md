@@ -25,3 +25,8 @@
 
 这个网站源很多
 中国科技大学  https://mirrors.ustc.edu.cn/
+
+
+
+IPv4网关
+IPv4网关是连接专有网络VPC（Virtual Private Cloud）和互联网（internet）的网络组件，VPC访问IPv4公网的流量经过IPv4网关，由IPv4网关实现路由转发以及私网地址到公网地址转换，最终实现对公网的访问。

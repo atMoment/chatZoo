@@ -25,6 +25,7 @@ func TestWriteAnything(t *testing.T) {
 	}
 	cfg.App["gate"] = _AppConfig{
 		ListenAddr: "127.0.0.1:7788",
+		OuterAddr:  "127.0.0.1:7788",
 		PprofAddr:  "127.0.0.1:6640",
 	}
 	cfg.App["login"] = _AppConfig{
