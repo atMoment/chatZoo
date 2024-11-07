@@ -152,7 +152,7 @@ func (s *_Srv) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rsp.PublicKey = publicKey.String()
-	rsp.GateAddr = s.cfg.GetAppListenAddr(cfg.AppTypeGate)
+	rsp.GateAddr = s.cfg.GetAppOuterAddr(cfg.AppTypeGate)
 	rsp.Code = Code_Success
 }
 
@@ -206,6 +206,6 @@ func (s *_Srv) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rsp.PublicKey = publicKey.String()
-	rsp.GateAddr = s.cfg.GetAppListenAddr(cfg.AppTypeGate)
+	rsp.GateAddr = s.cfg.GetAppOuterAddr(cfg.AppTypeGate)
 	rsp.Code = Code_Success
 }

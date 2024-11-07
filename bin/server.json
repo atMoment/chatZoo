@@ -2,10 +2,12 @@
 	"App": {
 		"gate": {
 			"listen_addr": "127.0.0.1:7788",
+			"outer_addr": "127.0.0.1:7788",
 			"pprof_addr": "127.0.0.1:6640"
 		},
 		"login": {
-			"listen_addr": "127.0.0.1:7789",
+			"listen_addr": "106.15.92.139:7789",
+			"outer_addr": "",
 			"pprof_addr": "127.0.0.1:6641"
 		}
 	},

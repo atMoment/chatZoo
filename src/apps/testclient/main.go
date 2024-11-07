@@ -52,7 +52,7 @@ func main() {
 
 	conn, err := net.Dial("tcp", client.gateAddr)
 	if err != nil {
-		fmt.Println("net.Dial err ", err)
+		fmt.Printf("net.Dial err:%v gateAddr:%v\n", err, client.gateAddr)
 		return
 	}
 

@@ -12,6 +12,7 @@ type _ChatZooServerConfig struct {
 
 type _AppConfig struct {
 	ListenAddr string `json:"listen_addr"`
+	OuterAddr  string `json:"outer_addr"`
 	PprofAddr  string `json:"pprof_addr"`
 }
 
