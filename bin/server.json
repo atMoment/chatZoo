@@ -1,0 +1,29 @@
+{
+	"App": {
+		"gate": {
+			"listen_addr": "127.0.0.1:7788",
+			"outer_addr": "127.0.0.1:7788",
+			"pprof_addr": "127.0.0.1:6640"
+		},
+		"login": {
+			"listen_addr": "127.0.0.1:7789",
+			"outer_addr": "192.168.40.39:7789",
+			"pprof_addr": "127.0.0.1:6641"
+		}
+	},
+	"Common": {
+		"mysql": {
+			"mysql_addr": "127.0.0.1:3306",
+			"mysql_user": "root",
+			"mysql_pwd": "111111",
+			"mysql_data_base": "chatZoo",
+			"mysql_cmd_timeout_sec": 3
+		},
+		"redis": {
+			"redis_addr": "127.0.0.1:6379",
+			"redis_pwd": "",
+			"redis_db": 8,
+			"redis_cmd_timeout_sec": 3
+		}
+	}
+}

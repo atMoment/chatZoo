@@ -1,6 +1,8 @@
 package main
 
 import (
+	"ChatZoo/common/cfg"
+	"ChatZoo/common/db"
 	"context"
 	"fmt"
 	"net"
@@ -8,6 +10,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 type _App struct {
@@ -15,19 +18,27 @@ type _App struct {
 	appCtx    context.Context
 	appCancel context.CancelFunc
 	wg        *sync.WaitGroup
+	cfg       cfg.IChatZooServerConfig
+	cacheUtil db.ICacheUtil
 }
 
 func NewApp() *_App {
 	app := &_App{
 		exitChan: make(chan struct{}, 1), // 长度为1或者不为1都一样吗？
 		wg:       &sync.WaitGroup{},
+		cfg:      cfg.NewServerConfig(),
 	}
 	app.appCtx, app.appCancel = context.WithCancel(context.Background())
+	cacheUtil, err := db.NewCacheUtil(app.cfg.GetRedisCfg().RedisAddr, app.cfg.GetRedisCfg().RedisPwd, app.cfg.GetRedisCfg().RedisDB, time.Duration(app.cfg.GetRedisCfg().RedisCmdTimeoutSec)*time.Second)
+	if err != nil {
+		panic(err)
+	}
+	app.cacheUtil = cacheUtil
 	return app
 }
 
 func (a *_App) Run() {
-	ln, err := net.Listen("tcp", "127.0.0.1:7788") // 必须外部配置
+	ln, err := net.Listen("tcp", a.cfg.GetAppListenAddr(cfg.AppTypeGate)) // 必须外部配置
 	if err != nil {
 		fmt.Println("net listen err ", err)
 		return
@@ -53,7 +64,7 @@ func (a *_App) acceptHandler(ln net.Listener) {
 			a.exitChan <- struct{}{} // 给父协程发信号, 让老父亲别等了, 我也要销毁了
 			return
 		}
-		session := NewSession(a.appCtx, conn, a.wg)
+		session := NewSession(a.appCtx, conn, a.wg, a.cacheUtil)
 		go session.procLoop()
 	}
 }

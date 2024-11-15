@@ -2,8 +2,11 @@ package main
 
 import (
 	"ChatZoo/common"
+	"ChatZoo/common/db"
+	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -25,25 +28,28 @@ const (
 )
 
 type _Session struct {
-	user   *_User
-	conn   net.Conn
-	wg     *sync.WaitGroup // 通知我的父协程我结束了
-	ticker *time.Ticker
-	ctx    context.Context    // 用于接收父协程结束的信号
-	cancel context.CancelFunc // 暂时没用
+	user      *_User
+	conn      net.Conn
+	wg        *sync.WaitGroup // 通知我的父协程我结束了
+	ticker    *time.Ticker
+	ctx       context.Context    // 用于接收父协程结束的信号
+	cancel    context.CancelFunc // 暂时没用
+	cacheUtil db.ICacheUtil
 	//sendCh    chan common.IMessage // 需要往套接字里写的消息都放这里
 }
 
-func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup) *_Session {
+func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup, cacheUtil db.ICacheUtil) *_Session {
 	ctx, cancel := context.WithCancel(appCtx)
-	return &_Session{
-		wg:     wg,
-		ctx:    ctx,
-		cancel: cancel,
-		conn:   conn,
-		ticker: time.NewTicker(TickerInterval),
+	s := &_Session{
+		wg:        wg,
+		ctx:       ctx,
+		cancel:    cancel,
+		conn:      conn,
+		ticker:    time.NewTicker(TickerInterval),
+		cacheUtil: cacheUtil,
 		//sendCh:    make(chan common.IMessage, chCacheSize),
 	}
+	return s
 }
 
 func (s *_Session) procLoop() {
@@ -76,7 +82,15 @@ func (s *_Session) readConn() {
 			}
 			switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
 			case *mmsg.MsgUserLogin:
-				s.createUser(m) // 这是一条非常特殊的消息
+				err = s.createUser(m) // 这是一条非常特殊的消息
+				var errString string
+				if err != nil {
+					errString = err.Error()
+				}
+				mmsg.WriteToConn(s.conn, &mmsg.MsgUserLoginResp{
+					Err: errString,
+				})
+				fmt.Printf("gate login isSuccess:%v, openID:%v isVisitor:%v err:%v\n", errString == "", m.OpenID, m.IsVisitor, errString)
 			default:
 				fmt.Println("unknown msg ", msg.GetID())
 			}
@@ -132,26 +146,29 @@ func (s *_Session) sendHeartbeat() {
 // 怎么做到客户端等待服务器返回值的？
 // tcp 一来一回的怎么做到等待回的？  用channel, 直到回的那条来了才放开
 
-func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
+func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 	openID := msg.OpenID
 	if len(openID) == 0 {
-		fmt.Println("rcpUserLogin, openID is empty ")
-		return
+		return errors.New("openID is empty")
 	}
+	_, err := login.VerifyLoginToken(openID, s.cacheUtil, msg.PublicKey)
+	if err != nil {
+		return fmt.Errorf("verify token err:%v", err)
+	}
+	// todo 后续的消息用这个加密解密   login消息不加密吗？
 	// entity 内存中如果在了, 要先销毁后新创建, 因为session肯定不是原来的session 了
 	if msg.IsVisitor {
 		// 查重, 内存中没有这个entity
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
-		user, err := NewUser(openID, s.conn)
-		if err != nil {
-			fmt.Println("new user err ", err)
-			return
+		user, err2 := NewUser(openID, s.conn)
+		if err2 != nil {
+			return fmt.Errorf("new user err:%v", err2)
 		}
 		common.DefaultSrvEntity.AddEntity(openID, user)
 		s.user = user
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
-		return
+		return nil
 	}
 
 	// 注册
@@ -160,10 +177,10 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) {
 	// 创建一个entity ( 查重, userID 有没有重复)
 	user, err := NewUser(openID, s.conn)
 	if err != nil {
-		fmt.Println("new user err ", err)
-		return
+		return fmt.Errorf("new user err:%v", err)
 	}
 	common.DefaultSrvEntity.AddEntity(openID, user)
 	s.user = user
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
+	return nil
 }
