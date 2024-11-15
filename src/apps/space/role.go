@@ -24,7 +24,7 @@ func (r *_User) JoinRoom(roomID string) string {
 		fmt.Println("chat get entity err ", err)
 		return "failed"
 	}
-	room.joinRoom(r.GetEntityID())
+	room.JoinRoom(r.GetEntityID())
 	r.joinRoomID = roomID
 	fmt.Printf("Room JoinRoom  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
 	return "success"
@@ -38,6 +38,7 @@ func (r *_User) QuitRoom(roomID string) {
 
 }
 
+/*
 func (r *_User) ChatRoom(content string) string {
 	if len(r.joinRoomID) == 0 {
 		return "ChatRoom failed, roomID is empty"
@@ -52,3 +53,4 @@ func (r *_User) ChatRoom(content string) string {
 	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), r.joinRoomID, content)
 	return "ChatRoom success"
 }
+*/

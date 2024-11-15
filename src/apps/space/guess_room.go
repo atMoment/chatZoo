@@ -62,7 +62,7 @@ func (r *_ChainRoom) collect(player, content string) {
 	}
 
 	r.curTurn++
-	for i, member := range r.turns[r.curTurn] {
+	for _, member := range r.turns[r.curTurn] {
 		r.NotifyMember(member, "ChainGameTurnBegin", r.records[d])
 		r.readyMap[member] = r.curTurn
 	}

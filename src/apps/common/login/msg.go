@@ -1,13 +1,15 @@
 package login
 
 type LoginReq struct {
-	ID        string `json:"id"`         // 也可以是name?
+	ID        string `json:"id"` // 也可以是name?
+	Pwd       string `json:"pwd"`
 	IsVisitor bool   `json:"is_visitor"` // 是否游客
 	PublicKey string `json:"public_key"`
 }
 
 type RegisterReq struct {
 	Name      string `json:"name"`
+	Pwd       string `json:"pwd"`
 	PublicKey string `json:"public_key"`
 }
 

@@ -92,8 +92,8 @@ func (s *_Srv) run() {
 	}
 	go func() {
 		if err := http.ListenAndServe(s.cfg.GetAppListenAddr(s.typ), nil); err != nil {
-			close(over)
 			fmt.Println("login listen err: ", err)
+			close(over)
 		}
 	}()
 	<-over
@@ -119,11 +119,25 @@ func (s *_Srv) handleRegister(w http.ResponseWriter, r *http.Request) {
 		rsp.Code = Code_Failed
 		return
 	}
+	if len(req.Name) == 0 {
+		rsp.Err = fmt.Sprintf("name is empty")
+		rsp.Code = Code_Failed
+		return
+	}
 	if len(req.Name) > 16 {
 		rsp.Err = fmt.Sprintf("name is toolong")
 		rsp.Code = Code_Failed
 		return
 	}
+
+	sqlStr := fmt.Sprintf("insert into %s(ID, Pwd,Data) values (?,?,?)  ", mysqlTableUser)
+	err = s.storeUtil.InsertData(sqlStr, req.Name, req.Pwd, []byte{})
+	if err != nil {
+		rsp.Err = err.Error()
+		rsp.Code = Code_Failed
+		return
+	}
+
 	clientPublicKey, ok := big.NewInt(0).SetString(req.PublicKey, 0)
 	if !ok {
 		rsp.Err = fmt.Sprintf("publicKey is illegal")
@@ -134,17 +148,7 @@ func (s *_Srv) handleRegister(w http.ResponseWriter, r *http.Request) {
 	privateKey, publicKey := encrypt.Pair()
 	secret := encrypt.Key(privateKey, clientPublicKey).String()
 
-	err = login.SaveLoginToken(s.cacheUtil, req.PublicKey, secret)
-	if err != nil {
-		rsp.Err = err.Error()
-		rsp.Code = Code_Failed
-		return
-	}
-
-	// 如果先save 后insert 失败了怎么办？ 没关系, redis 等会就过期了, 让玩家重新登
-
-	sqlStr := fmt.Sprintf("insert into %s(ID, Data) values (?,?)  ", mysqlTableUser)
-	err = s.storeUtil.InsertData(sqlStr, req.Name, []byte{})
+	err = login.SaveLoginToken(req.Name, s.cacheUtil, req.PublicKey, secret)
 	if err != nil {
 		rsp.Err = err.Error()
 		rsp.Code = Code_Failed
@@ -174,17 +178,22 @@ func (s *_Srv) handleLogin(w http.ResponseWriter, r *http.Request) {
 		rsp.Code = Code_Failed
 		return
 	}
+	if len(req.ID) == 0 {
+		rsp.Err = fmt.Sprintf("id is empty")
+		rsp.Code = Code_Failed
+		return
+	}
 	if !req.IsVisitor { // 非游客检查注册信息
-		sqlStr := fmt.Sprintf("select ID from %s where ID = ? ", mysqlTableUser)
-		var id string
-		err = s.storeUtil.SelectData(sqlStr, &id, req.ID)
+		sqlStr := fmt.Sprintf("select Pwd from %s where ID = ? ", mysqlTableUser)
+		var pwd string
+		err = s.storeUtil.SelectData(sqlStr, &pwd, req.ID)
 		if err != nil {
 			rsp.Err = err.Error()
 			rsp.Code = Code_Failed
 			return
 		}
-		if id != req.ID {
-			rsp.Err = errors.New("id not match").Error()
+		if pwd != req.Pwd {
+			rsp.Err = errors.New("pwd not match").Error()
 			rsp.Code = Code_Failed
 			return
 		}
@@ -199,7 +208,7 @@ func (s *_Srv) handleLogin(w http.ResponseWriter, r *http.Request) {
 	privateKey, publicKey := encrypt.Pair()
 	secret := encrypt.Key(privateKey, clientPublicKey).String()
 
-	err = login.SaveLoginToken(s.cacheUtil, req.PublicKey, secret)
+	err = login.SaveLoginToken(req.ID, s.cacheUtil, req.PublicKey, secret)
 	if err != nil {
 		rsp.Err = err.Error()
 		rsp.Code = Code_Failed

@@ -151,7 +151,7 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 	if len(openID) == 0 {
 		return errors.New("openID is empty")
 	}
-	_, err := login.VerifyLoginToken(s.cacheUtil, msg.PublicKey)
+	_, err := login.VerifyLoginToken(openID, s.cacheUtil, msg.PublicKey)
 	if err != nil {
 		return fmt.Errorf("verify token err:%v", err)
 	}

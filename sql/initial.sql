@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS `User`;
 CREATE TABLE `User`  (
 
     `ID` char(16) NOT NULL,
+	`Pwd` char(16) NOT NULL,
 
     `Data` mediumblob NULL,
 	

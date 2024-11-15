@@ -15,15 +15,19 @@ const (
 	CommunicationKeyExpiration = 10 * time.Second
 )
 
-func SaveLoginToken(cacheUtil db.ICacheUtil, clientPublicKey string, communicationSecret string) error {
-	return cacheUtil.Set(redisTableCommunicationKey, combineKey(clientPublicKey, communicationSecret), CommunicationKeyExpiration)
+func GetUserCommunicationKey(userid string) string {
+	return fmt.Sprintf("%s:%s", redisTableCommunicationKey, userid)
 }
 
-func VerifyLoginToken(cacheUtil db.ICacheUtil, clientPublicKey string) (string, error) {
+func SaveLoginToken(id string, cacheUtil db.ICacheUtil, clientPublicKey string, communicationSecret string) error {
+	return cacheUtil.Set(GetUserCommunicationKey(id), combineKey(clientPublicKey, communicationSecret), CommunicationKeyExpiration)
+}
+
+func VerifyLoginToken(id string, cacheUtil db.ICacheUtil, clientPublicKey string) (string, error) {
 	if len(clientPublicKey) == 0 {
 		return "", errors.New("client public key is empty")
 	}
-	ret, err := cacheUtil.Get(redisTableCommunicationKey)
+	ret, err := cacheUtil.Get(GetUserCommunicationKey(id))
 	if err != nil {
 		return "", err
 	}

@@ -43,8 +43,9 @@ const (
 
 func main() {
 	client := NewClient()
-	client.userLoginInput()
-	err := client.sendLoginHttp()
+	isRegister, isLogin, isVisitor, openID, pwd := client.userLoginInput()
+	client.isVisitor = isVisitor
+	err := client.sendLoginHttp(isRegister, isLogin, isVisitor, openID, pwd)
 	if err != nil {
 		fmt.Println("send login http err ", err)
 		return
@@ -118,8 +119,6 @@ func showGameHall() string {
 }
 
 type _Client struct {
-	isRegister             bool
-	isLogin                bool
 	isVisitor              bool
 	openID                 string
 	gateAddr               string
@@ -134,8 +133,8 @@ func NewClient() *_Client {
 	}
 }
 
-// userLoginInput 玩家登录输入  返回值:是否注册, 是否登录, 是否游客, openID
-func (s *_Client) userLoginInput() {
+// userLoginInput 玩家登录输入  返回值:是否注册, 是否登录, 是否游客, openID, pwd
+func (s *_Client) userLoginInput() (bool, bool, bool, string, string) {
 	var (
 		register = "register"
 		login    = "login"
@@ -143,7 +142,7 @@ func (s *_Client) userLoginInput() {
 	)
 
 	// Login 登录/注册账号或者游客登录
-	var input, openID string
+	var input, openID, pwd string
 	var isRegister, isLogin, isVisitor bool
 	fmt.Println("登录账号请输入 login, 注册账号请输入 register, 游客登录请使用 visitor")
 	for {
@@ -160,6 +159,8 @@ func (s *_Client) userLoginInput() {
 			fmt.Println("请输入注册的账号名字, 不允许带空格")
 			fmt.Scanln(&openID) // 从标准控制中输入,以空格分隔
 			if len(openID) != 0 {
+				fmt.Println("请输入注册的账号密码, 不允许带空格")
+				fmt.Scanln(&pwd) // 从标准控制中输入,以空格分隔,
 				isRegister = true
 				break
 			}
@@ -170,6 +171,8 @@ func (s *_Client) userLoginInput() {
 			fmt.Println("请输入登录的账号名字")
 			fmt.Scanln(&openID)
 			if len(openID) != 0 {
+				fmt.Println("请输入登录的账号密码, 不允许带空格")
+				fmt.Scanln(&pwd) // 从标准控制中输入,以空格分隔
 				isLogin = true
 				break
 			}
@@ -178,24 +181,21 @@ func (s *_Client) userLoginInput() {
 	case visitor: // 游客没有openID
 		isVisitor = true
 	}
-
-	s.isRegister = isRegister
-	s.isLogin = isLogin
-	s.isVisitor = isVisitor
-	s.openID = openID
+	return isRegister, isLogin, isVisitor, openID, pwd
 }
 
-func (s *_Client) sendLoginHttp() error {
+func (s *_Client) sendLoginHttp(isRegister, isLogin, isVisitor bool, openID, pwd string) error {
 	url := "http://" + s.cfg.GetAppListenAddr(cfg.AppTypeLogin)
 	var info []byte
 	var err error
 
 	clientPrivateKey, clientPublicKey := encrypt.Pair()
 
-	if s.isRegister {
+	if isRegister {
 		url += "/register"
 		req := login.RegisterReq{
-			Name:      s.openID,
+			Name:      openID,
+			Pwd:       pwd,
 			PublicKey: clientPublicKey.String(),
 		}
 		if info, err = json.Marshal(req); err != nil {
@@ -203,7 +203,7 @@ func (s *_Client) sendLoginHttp() error {
 		}
 	}
 
-	if s.isVisitor {
+	if isVisitor {
 		url += "/login"
 		req := login.LoginReq{
 			IsVisitor: true,
@@ -214,10 +214,11 @@ func (s *_Client) sendLoginHttp() error {
 		}
 	}
 
-	if s.isLogin {
+	if isLogin {
 		url += "/login"
 		req := login.LoginReq{
-			ID:        s.openID,
+			ID:        openID,
+			Pwd:       pwd,
 			PublicKey: clientPublicKey.String(),
 		}
 		if info, err = json.Marshal(req); err != nil {
@@ -249,6 +250,7 @@ func (s *_Client) sendLoginHttp() error {
 	s.gateAddr = resp.GateAddr
 	s.clientPublicKey = clientPublicKey.String()
 	s.communicationSecretKey = encrypt.Key(clientPrivateKey, serverPublicKey).String()
+	s.openID = openID
 	return nil
 }
 
