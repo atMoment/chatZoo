@@ -70,6 +70,10 @@ func (r *_User) Notify_SToCMessage(msg string) {
 	fmt.Println("receive msg ", msg)
 }
 
+func (r *_User) ChainGameTurnBegin(msg string) {
+	fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", msg)
+}
+
 /*
 流程和剩下的安排
 1. 登录/游客账号

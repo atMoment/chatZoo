@@ -38,6 +38,21 @@ func (r *_User) QuitRoom(roomID string) {
 
 }
 
+func (r *_User) Ready() string {
+	if len(r.joinRoomID) == 0 {
+		return "ChatRoom failed, roomID is empty"
+	}
+	room, err := roomMgr.AddOrGetEntity(r.joinRoomID)
+	if err != nil {
+		fmt.Println("chat get entity err ", err)
+
+		return "ChatRoom failed"
+	}
+	room.(r.GetEntityID(), r.GetEntityID(), content)
+	fmt.Printf("Room chat  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), r.joinRoomID, content)
+	return "ChatRoom success"
+}
+
 /*
 func (r *_User) ChatRoom(content string) string {
 	if len(r.joinRoomID) == 0 {

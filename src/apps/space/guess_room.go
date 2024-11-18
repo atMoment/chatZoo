@@ -26,15 +26,28 @@ const (
 	gameIntervalDuration = 5 * time.Minute
 )
 
+/*
+流程
+
+
+*/
+
 // 接龙房间
 type _ChainRoom struct {
 	IRoom
-	readyMap map[string]int     // key: 已经准备好的选手 val: 当前第几道
-	turns    [][]string         // key: 第几道 val: 预备参加的选手名单按次序
-	first    []string           // key: 第几道, val: 第一个字
-	records  map[int][]*_Record // key: 第几道, val: 选手及选手答案
-	curTurn  int                // 当前轮次
+	readyMap map[string]struct{} // key: 已经准备好的选手
+	turns    [][]string          // i: 某赛道的接棒选手们, j: 要接第几棒的选手
+	first    []string            // key: 赛道, val: 第一个字
+	records  [][]*_Record        // i 赛道  j:某一棒选手表现
+	curTurn  int                 // 当前到第几棒
 	timer    *time.Timer
+}
+
+func NewChainRoom(limit int) *_ChainRoom {
+	return &_ChainRoom{
+		IRoom:    NewRoom(limit),
+		readyMap: make(map[string]struct{}),
+	}
 }
 
 type _Record struct {
@@ -42,33 +55,53 @@ type _Record struct {
 	content string
 }
 
+// ready 每个玩家准备好了, 就调用ready
 func (r *_ChainRoom) ready(player string) {
 	// 所有人全部ready 游戏自动开始
-	r.readyMap[player] = -1
+	r.readyMap[player] = struct{}{}
 	if len(r.readyMap) == r.GetRoomMemberLimit() {
 		r.start()
 	}
 }
 
+// collect 每轮中玩家发言
 func (r *_ChainRoom) collect(player, content string) {
-	if r.curTurn == len(r.first) {
-		fmt.Println("轮次结束")
+	if r.curTurn == r.GetRoomMemberLimit() {
+		fmt.Println("轮次结束,不应该发言")
 		return
 	}
-	d := r.readyMap[player]
-	r.records[d] = append(r.records[d], &_Record{actor: player, content: content})
-	if len(r.records[r.curTurn]) != r.GetRoomMemberLimit() {
+	// 找到这个选手是哪个赛道
+	track := -1
+	for i := 0; i < r.GetRoomMemberLimit(); i++ {
+		if r.turns[i][r.curTurn] == player {
+			track = i
+			break
+		}
+	}
+	if track == -1 {
+		fmt.Println("player illegal ", player)
 		return
 	}
+
+	r.records[track] = append(r.records[track], &_Record{actor: player, content: content})
+	if !r.canReachNextLevel() {
+		fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,等待其他队伍交棒\n", r.curTurn, track, player, content)
+		return
+	}
+	fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,所有赛道已交棒,进入下一轮次\n", r.curTurn, track, player, content)
 
 	r.curTurn++
-	for _, member := range r.turns[r.curTurn] {
-		r.NotifyMember(member, "ChainGameTurnBegin", r.records[d])
-		r.readyMap[member] = r.curTurn
-	}
-
+	r.timer.Reset(gameIntervalDuration)
 	if r.curTurn == r.GetRoomMemberLimit() {
 		r.gameOver()
+		return
+	}
+
+	for i := 0; i < r.GetRoomMemberLimit(); i++ {
+		member := r.turns[i][r.curTurn]          // 各自赛道的第x棒选手
+		key := r.records[i][len(r.records[i])-1] // 各自赛道的棒
+		// 通知选手起跑
+		r.NotifyMember(member, "ChainGameTurnBegin", key)
 	}
 }
 
@@ -83,12 +116,24 @@ func (r *_ChainRoom) start() {
 		panic(fmt.Sprintf("getPlayerTurn err:%v", err))
 	}
 
-	for i, member := range r.turns[0] {
-		r.NotifyMember(member, "ChainGameTurnBegin", r.first[i])
-		r.readyMap[member] = 0
+	r.records = make([][]*_Record, len(r.turns))
+	for i := 0; i < r.GetRoomMemberLimit(); i++ {
+		member := r.turns[i][0] // 各自赛道的第0棒选手
+		firstKey := r.first[i]  // 各自赛道的棒
+		// 通知选手起跑
+		r.NotifyMember(member, "ChainGameTurnBegin", firstKey)
+		r.records[i] = append(r.records[i], &_Record{
+			actor:   "system",
+			content: firstKey,
+		})
 	}
-	r.timer = time.AfterFunc(gameIntervalDuration, r.gameOver)
-	fmt.Printf("game start %v %v %v\n", r.first, r.turns[r.curTurn], r.curTurn)
+	r.timer = time.AfterFunc(gameIntervalDuration, r.dealTimeOut)
+	fmt.Printf("game start firstKey:%v turn:%+v curTurn:%v\n", r.first, r.turns, r.curTurn)
+}
+
+func (r *_ChainRoom) dealTimeOut() {
+	fmt.Printf("超时期限到,有玩家未回答,游戏结束\n")
+	r.gameOver()
 }
 
 func (r *_ChainRoom) gameOver() {
@@ -96,9 +141,21 @@ func (r *_ChainRoom) gameOver() {
 		r.timer.Stop()
 		r.timer = nil
 	}
-	r.IRoom.NotifyAllMember("ChainGameOver")
-	// 游戏结算,展示所有记录, 并发送给所有玩家
-	// 现在服务器和客户端暂不支持map, 就先服务器自己看吧
+	// 告诉所有玩家游戏结果
+	r.NotifyAllMember("ChainGameOver", r.records)
+	fmt.Printf("game over, all result:%+v\n", r.records)
+	// todo 触发房间销毁？
+}
+
+// canReachNextLevel 是否可以进入到下一棒
+func (r *_ChainRoom) canReachNextLevel() bool {
+	// 检查每一个赛道, 是否都已经交棒
+	for i := 0; i < r.GetRoomMemberLimit(); i++ {
+		if len(r.records[i]) != r.curTurn+2 {
+			return false
+		}
+	}
+	return true
 }
 
 // getFirstKey 先从池里随机出关键字

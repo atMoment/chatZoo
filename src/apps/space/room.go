@@ -10,8 +10,8 @@ import (
 // 一些特别简单的狗屎代码
 const (
 	_ = iota
-	chat
-	guess
+	RoomType_Chat
+	RoomType_Guess
 )
 
 var roomMgr = &_RoomMgr{}
@@ -28,7 +28,12 @@ func (mgr *_RoomMgr) AddEntity(userID string) {
 	mgr.rooms.Store(userID, room)
 }
 
-func (mgr *_RoomMgr) AddOrGetEntity(userID string) (*_Room, error) {
+func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ int) (IRoom, error) {
+	switch typ {
+	case RoomType_Guess:
+		room := NewChainRoom(4)
+
+	}
 	room := &_Room{
 		createTime: time.Now().UnixNano(),
 		memberList: make(map[string]struct{}),
@@ -39,7 +44,7 @@ func (mgr *_RoomMgr) AddOrGetEntity(userID string) (*_Room, error) {
 		return room, nil
 	}
 
-	ret, transOk := entityInfo.(*_Room)
+	ret, transOk := entityInfo.(IRoom)
 	if !transOk {
 		return nil, errors.New("trans userinfo err")
 	}
@@ -84,6 +89,7 @@ func NewRoom(limit int) IRoom {
 	return &_Room{
 		limit:      limit,
 		createTime: time.Now().Unix(),
+		memberList: make(map[string]struct{}),
 	}
 }
 
