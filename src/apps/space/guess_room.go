@@ -34,7 +34,7 @@ const (
 
 // 接龙房间
 type _ChainRoom struct {
-	IRoom
+	IRoomBase
 	readyMap map[string]struct{} // key: 已经准备好的选手
 	turns    [][]string          // i: 某赛道的接棒选手们, j: 要接第几棒的选手
 	first    []string            // key: 赛道, val: 第一个字
@@ -45,8 +45,8 @@ type _ChainRoom struct {
 
 func NewChainRoom(limit int) *_ChainRoom {
 	return &_ChainRoom{
-		IRoom:    NewRoom(limit),
-		readyMap: make(map[string]struct{}),
+		IRoomBase: NewRoom(limit, RoomType_Chain),
+		readyMap:  make(map[string]struct{}),
 	}
 }
 

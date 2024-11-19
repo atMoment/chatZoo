@@ -7,9 +7,16 @@ import (
 )
 
 type _ChatRoom struct {
-	IRoom
+	IRoomBase
 	msgCache []*_ChatRoomMsg // 消息缓存
 	cfg      *_ChatRoomCfg
+}
+
+func NewChatRoom(limit int) *_ChatRoom {
+	return &_ChatRoom{
+		IRoomBase: NewRoom(limit),
+		msgCache:  make([]*_ChatRoomMsg, 0),
+	}
 }
 
 type _ChatRoomCfg struct {
