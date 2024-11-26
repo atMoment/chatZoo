@@ -108,11 +108,14 @@ func waitLoginResp(conn net.Conn) error {
 	return nil
 }
 
-func showGameHall() string {
-	fmt.Println("welcome to chatZoo, this is game hall. we support some game ")
+func showGameHall(openid string, moduleList []string) string {
+	fmt.Printf("%s welcome to chatZoo, this is game hall. we support some game ", openid)
 	fmt.Println("[ > w < ]. [ * v * ]. [ /// - /// ]. [ ` ~ ` ]. [ :) ] ")
 	var moduleName string
-	fmt.Printf("[%v] [%v]\n", ModuleNameChat, ModuleNameFourOperationCalculate)
+	for _, v := range moduleList {
+		fmt.Printf(" [%v] ", v)
+	}
+	fmt.Printf("\n")
 	fmt.Println("请输入选择的模块")
 	fmt.Scanln(&moduleName)
 	return moduleName
@@ -178,8 +181,9 @@ func (s *_Client) userLoginInput() (bool, bool, bool, string, string) {
 			}
 			fmt.Printf("当前账号名字输入为：%v, 此为无效输入\n", openID)
 		}
-	case visitor: // 游客没有openID
+	case visitor: // 游客是随机生成的openID
 		isVisitor = true
+		openID = encrypt.NewGUID()
 	}
 	return isRegister, isLogin, isVisitor, openID, pwd
 }
@@ -206,6 +210,7 @@ func (s *_Client) sendLoginHttp(isRegister, isLogin, isVisitor bool, openID, pwd
 	if isVisitor {
 		url += "/login"
 		req := login.LoginReq{
+			ID:        openID,
 			IsVisitor: true,
 			PublicKey: clientPublicKey.String(),
 		}
@@ -255,9 +260,6 @@ func (s *_Client) sendLoginHttp(isRegister, isLogin, isVisitor bool, openID, pwd
 }
 
 func (s *_Client) sendLoginTcp(conn net.Conn) error {
-	if s.isVisitor {
-		s.openID = conn.LocalAddr().String()
-	}
 	err := mmsg.WriteToConn(conn, &mmsg.MsgUserLogin{
 		OpenID:    s.openID,
 		IsVisitor: s.isVisitor,

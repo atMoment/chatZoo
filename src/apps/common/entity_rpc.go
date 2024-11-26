@@ -175,6 +175,11 @@ func (s *_EntityRpc) receiveReq(msg *mmsg.MsgCmdReq) error {
 	for i, arg := range args {
 		in[i] = reflect.ValueOf(arg)
 	}
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Call panic, methodName:%v err:%v, arg:%v\n", msg.MethodName, err, args)
+		}
+	}()
 	rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
 	out := make([]interface{}, len(rets))
 	for i, ret := range rets {

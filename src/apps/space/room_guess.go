@@ -32,6 +32,11 @@ const (
 
 */
 
+type IChainRoom interface {
+	Ready(player string)
+	Collect(player, content string)
+}
+
 // 接龙房间
 type _ChainRoom struct {
 	IRoomBase
@@ -42,21 +47,22 @@ type _ChainRoom struct {
 	curTurn  int                 // 当前到第几棒
 	timer    *time.Timer
 }
-
-func NewChainRoom(limit int) *_ChainRoom {
-	return &_ChainRoom{
-		IRoomBase: NewRoom(limit, RoomType_Chain),
-		readyMap:  make(map[string]struct{}),
-	}
-}
-
 type _Record struct {
 	actor   string
 	content string
 }
 
-// ready 每个玩家准备好了, 就调用ready
-func (r *_ChainRoom) ready(player string) {
+func NewChainRoom(limit int) *_ChainRoom {
+	chainRoom := &_ChainRoom{
+		IRoomBase: NewRoom(limit),
+		readyMap:  make(map[string]struct{}),
+	}
+	chainRoom.SetType(RoomType_Chain)
+	return chainRoom
+}
+
+// Ready 有玩家准备好时调用
+func (r *_ChainRoom) Ready(player string) {
 	// 所有人全部ready 游戏自动开始
 	r.readyMap[player] = struct{}{}
 	if len(r.readyMap) == r.GetRoomMemberLimit() {
@@ -64,8 +70,8 @@ func (r *_ChainRoom) ready(player string) {
 	}
 }
 
-// collect 每轮中玩家发言
-func (r *_ChainRoom) collect(player, content string) {
+// Collect 每轮中玩家发言
+func (r *_ChainRoom) Collect(player, content string) {
 	if r.curTurn == r.GetRoomMemberLimit() {
 		fmt.Println("轮次结束,不应该发言")
 		return
@@ -142,7 +148,7 @@ func (r *_ChainRoom) gameOver() {
 		r.timer = nil
 	}
 	// 告诉所有玩家游戏结果
-	r.NotifyAllMember("ChainGameOver", r.records)
+	r.NotifyAllMember("ChainGameOver")
 	fmt.Printf("game over, all result:%+v\n", r.records)
 	// todo 触发房间销毁？
 }

@@ -13,14 +13,18 @@ const (
 	JoinRoom       = "2"
 	RecommendRoom  = "3"
 	ChatRoom       = "4"
+	RoomGuessReady = "5"
+	RoomGuessPlay  = "6"
 )
 
-func (u *_User) Chat() (string, string) {
+func (u *_Module) Chat() (string, string) {
 	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
 	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
-	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 joinroomname \n")
+	fmt.Printf("加入已有房间请输入 [2 房间名字 房间类型(1聊天房, 2接龙房)] 示例：2 joinroomname 2 \n")
 	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
 	fmt.Printf("聊天请输入 [4 聊天内容] 示例：4 content \n")
+	fmt.Printf("guess room 准备请输入 [5 ready] 示例：5 content \n")
+	fmt.Printf("guess room 发言请输入 [6 接龙内容] 示例：6 content \n")
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
@@ -40,7 +44,7 @@ func (u *_User) Chat() (string, string) {
 
 	cmds := strings.Split(words, " ")
 
-	if len(cmds) != 2 {
+	if len(cmds) == 0 {
 		fmt.Println(ModuleNameChat, " 无有效输入, 长度不对 ", len(cmds))
 		return "", ""
 	}
@@ -48,7 +52,8 @@ func (u *_User) Chat() (string, string) {
 	var ret string
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
-		methodName = "CreateRoom"
+		fmt.Println(ModuleNameChat, "暂不支持, sorry")
+		return "", ""
 	case JoinRoom:
 		methodName = "JoinRoom"
 	case RecommendRoom:
@@ -56,6 +61,10 @@ func (u *_User) Chat() (string, string) {
 		return "", ""
 	case ChatRoom:
 		methodName = "ChatRoom"
+	case RoomGuessReady:
+		methodName = "GuessRoomReady"
+	case RoomGuessPlay:
+		methodName = "GuessRoomSendMsg"
 	default:
 		fmt.Println(ModuleNameChat, " 参数不对 ")
 		return "", ""
@@ -68,10 +77,6 @@ func (u *_User) Chat() (string, string) {
 
 func (r *_User) Notify_SToCMessage(msg string) {
 	fmt.Println("receive msg ", msg)
-}
-
-func (r *_User) ChainGameTurnBegin(msg string) {
-	fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", msg)
 }
 
 /*

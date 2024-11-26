@@ -23,12 +23,12 @@ type _RoomMgr struct {
 	typ   int
 }
 
-func (mgr *_RoomMgr) AddEntity(userID string, typ int) {
-	mgr.rooms.Store(userID, createEntity(typ))
+func (mgr *_RoomMgr) AddEntity(userID string, typ, limit int) {
+	mgr.rooms.Store(userID, createEntity(typ, limit))
 }
 
-func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ int) (IRoom, error) {
-	room := createEntity(typ)
+func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ, limit int) (IRoom, error) {
+	room := createEntity(typ, limit)
 	// 找不到 返回 false
 	entityInfo, ok := mgr.rooms.LoadOrStore(userID, room)
 	if !ok {
@@ -53,11 +53,23 @@ func (mgr *_RoomMgr) GetEntity(userID string) (IRoom, error) {
 	}
 	switch ret.GetType() {
 	case RoomType_None:
-		return entityInfo.(*_Room), nil
+		entity, roomOk := entityInfo.(*_Room)
+		if !roomOk {
+			return entity, errors.New("can't trans room")
+		}
+		return entity, nil
 	case RoomType_Chat:
-		return entityInfo.(*_ChatRoom), nil
+		entity, roomOk := entityInfo.(*_ChatRoom)
+		if !roomOk {
+			return entity, errors.New("can't trans chat room")
+		}
+		return entity, nil
 	case RoomType_Chain:
-		return entityInfo.(*_ChainRoom), nil
+		entity, roomOk := entityInfo.(*_ChainRoom)
+		if !roomOk {
+			return entity, errors.New("can't trans chain room")
+		}
+		return entity, nil
 	default:
 		return nil, errors.New("room typ illegal")
 	}
@@ -67,15 +79,15 @@ func (mgr *_RoomMgr) DeleteEntity(userID string) {
 	mgr.rooms.Delete(userID)
 }
 
-func createEntity(typ int) IRoom {
+func createEntity(typ int, limit int) IRoom {
 	var room IRoom
 	switch typ {
 	case RoomType_Chain:
-		room = NewChainRoom(4)
+		room = NewChainRoom(limit)
 	case RoomType_Chat:
-		room = NewChatRoom(4)
+		room = NewChatRoom(limit)
 	default:
-		room = NewRoom(4)
+		room = NewRoom(limit)
 	}
 	return room
 }

@@ -8,6 +8,7 @@ import (
 
 type IRoomBase interface {
 	GetType() int
+	SetType(typ int)
 	JoinRoom(member string) error
 	QuitRoom(member string)
 	MemberIsExist(member string) bool
@@ -37,6 +38,10 @@ func NewRoom(limit int) *_Room {
 
 func (r *_Room) GetType() int {
 	return r.typ
+}
+
+func (r *_Room) SetType(typ int) {
+	r.typ = typ
 }
 
 func (r *_Room) JoinRoom(member string) error {

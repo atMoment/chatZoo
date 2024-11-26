@@ -12,7 +12,7 @@ const (
 )
 
 // FourOperationCalculate 根据标准输入向服务器发送 四则运算表达式运算请求
-func (u *_User) FourOperationCalculate() (string, string) {
+func (u *_Module) FourOperationCalculate() (string, string) {
 	fmt.Println("已连接计算服务器,请输入你的四则运算公式, 空格分割, \\n 为结束符, 例如 [3 * 3 + 9]")
 	//fmt.Scanln(&word) // 从标准控制中输入,以空格分隔
 	inputReader := bufio.NewReader(os.Stdin)

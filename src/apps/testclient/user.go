@@ -11,12 +11,16 @@ import (
 type _User struct {
 	wg *sync.WaitGroup
 	common.IEntityInfo
+	module *_Module
 }
+
+type _Module struct{}
 
 func NewUser(entityID string, conn net.Conn) *_User {
 	user := &_User{
 		wg:          &sync.WaitGroup{},
 		IEntityInfo: common.NewEntityInfo(entityID, conn),
+		module:      &_Module{},
 	}
 	user.SetRpc(user)
 	return user
@@ -38,14 +42,20 @@ func (u *_User) destroy() {
 // sendLoop 持续从标准输入中读取, 并发送给服务器
 func (u *_User) sendLoop() {
 	defer func() { u.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
+	moduleList := make([]string, 0)
+	t := reflect.TypeOf(u.module)
+	for i := 0; i < t.NumMethod(); i++ {
+		moduleList = append(moduleList, t.Method(i).Name)
+	}
+
 	// 玩家输入指令
 	var method reflect.Value
 	for {
-		v := reflect.ValueOf(u)
-		cmd := showGameHall()
+		v := reflect.ValueOf(u.module)
+		cmd := showGameHall(u.GetEntityID(), moduleList)
 		method = v.MethodByName(cmd)
 
-		if method.Kind() == reflect.Func && !method.IsNil() {
+		if method.Kind() == reflect.Func && !method.IsNil() { // 进入下一流程
 			break
 		}
 		fmt.Println("模块名不对, 请重新输入 ", cmd)
@@ -53,8 +63,8 @@ func (u *_User) sendLoop() {
 
 	for {
 		args := method.Call([]reflect.Value{})
-		if len(args) == 0 {
-			fmt.Println("methodName empty ")
+		if len(args) < 2 {
+			fmt.Println("模块失败, 参数数量错误 ")
 			continue
 		}
 		// reflect 全是卡点。 把 reflect.Value 转化成 string
@@ -63,6 +73,8 @@ func (u *_User) sendLoop() {
 			fmt.Println("methodName empty ")
 			continue
 		}
+		// 根据消息类型ID反解析参数, 解析出来怎么确定参数顺序
+		// map[index]interface
 
 		// 将 reflect.Value 还原成实际的类型
 		in := make([]interface{}, len(args)-1)

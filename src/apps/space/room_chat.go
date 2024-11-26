@@ -13,10 +13,12 @@ type _ChatRoom struct {
 }
 
 func NewChatRoom(limit int) *_ChatRoom {
-	return &_ChatRoom{
+	chatRoom := &_ChatRoom{
 		IRoomBase: NewRoom(limit),
 		msgCache:  make([]*_ChatRoomMsg, 0),
 	}
+	chatRoom.SetType(RoomType_Chat)
+	return chatRoom
 }
 
 type _ChatRoomCfg struct {
