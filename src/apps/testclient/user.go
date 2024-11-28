@@ -14,13 +14,21 @@ type _User struct {
 	module *_Module
 }
 
-type _Module struct{}
+type _Module struct {
+	*_ChainModule
+}
+
+func NewModule() *_Module {
+	return &_Module{
+		&_ChainModule{},
+	}
+}
 
 func NewUser(entityID string, conn net.Conn) *_User {
 	user := &_User{
 		wg:          &sync.WaitGroup{},
 		IEntityInfo: common.NewEntityInfo(entityID, conn),
-		module:      &_Module{},
+		module:      NewModule(),
 	}
 	user.SetRpc(user)
 	return user
@@ -73,14 +81,19 @@ func (u *_User) sendLoop() {
 			fmt.Println("methodName empty ")
 			continue
 		}
+		argMap, ok := args[1].Interface().(map[int]interface{})
+		if !ok {
+			fmt.Println("", args[1].Interface())
+			continue
+		}
 		// 根据消息类型ID反解析参数, 解析出来怎么确定参数顺序
 		// map[index]interface
 
 		// 将 reflect.Value 还原成实际的类型
-		in := make([]interface{}, len(args)-1)
-		var j int
-		for i := 1; i < len(args); i++ {
-			in[j] = args[i].Interface()
+		in := make([]interface{}, len(argMap))
+
+		for i := 0; i < len(argMap); i++ {
+			in[i] = args[i].Interface()
 		}
 		// 想要声明一个函数, 函数的返回值是 ...interface, 方便传入 SendReq中。 返回值是真实的类型而不是 真实类型转化后的interface类型
 		ret := <-u.GetRpc().SendReq(methodName, in...)

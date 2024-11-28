@@ -30,6 +30,8 @@ type IByteStream interface {
 	ReadInt64() (int64, error)
 	WriteString(v string) error
 	ReadString() (string, error)
+	WriteBytes(v []byte) error
+	ReadBytes() ([]byte, error)
 }
 
 type ByteStream struct {
@@ -65,22 +67,22 @@ func (bs *ByteStream) ReadLoop(f func(s IByteStream) (interface{}, error)) ([]in
 }
 
 const (
-	_                = iota
-	argTypeInt8      = 1
-	argTypeUint8     = 2
-	argTypeInt16     = 3
-	argTypeUint16    = 4
-	argTypeInt32     = 5
-	argTypeUint32    = 6
-	argTypeInt64     = 7
-	argTypeUint64    = 8
-	argTypeFloat32   = 9
-	argTypeFloat64   = 10
-	argTypeString    = 11
-	argTypeBytearray = 12
-	argTypeBool      = 13
-	argTypeNil       = 14
-	argTypeError     = 15
+	_              = iota
+	argTypeInt8    = 1
+	argTypeUint8   = 2
+	argTypeInt16   = 3
+	argTypeUint16  = 4
+	argTypeInt32   = 5
+	argTypeUint32  = 6
+	argTypeInt64   = 7
+	argTypeUint64  = 8
+	argTypeFloat32 = 9
+	argTypeFloat64 = 10
+	argTypeString  = 11
+	argTypeBytes   = 12 // []byte
+	argTypeBool    = 13
+	argTypeNil     = 14
+	argTypeError   = 15
 
 	argStreamMsg    = 20
 	argProtoBuffMsg = 21
@@ -241,6 +243,10 @@ func (bs *ByteStream) ReadInt64() (int64, error) {
 }
 
 func (bs *ByteStream) WriteString(v string) error {
+	return bs.WriteBytes([]byte(v))
+}
+
+func (bs *ByteStream) WriteBytes(v []byte) error {
 	var err error // 长度为uint32够用了, 4G的数据
 	if err = bs.WriteUint32(uint32(len(v))); err != nil {
 		return err
@@ -254,17 +260,22 @@ func (bs *ByteStream) WriteString(v string) error {
 }
 
 func (bs *ByteStream) ReadString() (string, error) {
+	ret, err := bs.ReadBytes()
+	return string(ret), err
+}
+
+func (bs *ByteStream) ReadBytes() ([]byte, error) {
 	length, err := bs.ReadUint32()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	ret := make([]byte, length)
 	for i := uint32(0); i < length; i++ {
 		v, readUint8Err := bs.ReadUint8()
 		if readUint8Err != nil {
-			return "", readUint8Err
+			return nil, readUint8Err
 		}
 		ret[i] = v
 	}
-	return string(ret), nil
+	return ret, nil
 }

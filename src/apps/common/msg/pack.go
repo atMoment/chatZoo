@@ -64,8 +64,55 @@ func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 	case string:
 		s.WriteUint8(argTypeString)
 		s.WriteString(m)
+	case []byte:
+		s.WriteUint8(argTypeBytes)
+		s.WriteBytes(m)
 	default:
-		return fmt.Errorf("pack failed, unsupported type:%v typeName:%v, msg:%v", m, reflect.TypeOf(msg).Name(), m)
+		kind := reflect.TypeOf(m).Kind()
+		if kind == reflect.Slice {
+			p.WriteAnySlice(m, s)
+			s.WriteUint8(argTypeAnySlice)
+		} else {
+			return fmt.Errorf("pack failed, unsupported type:%v typeName:%v, msg:%v", m, reflect.TypeOf(msg).Name(), m)
+		}
+	}
+	return nil
+}
+
+func (p *_AnyMsgPacker) WriteAnySlice(msg interface{}, s IByteStream) error {
+	arr := reflect.ValueOf(msg)
+	l := arr.Len()
+	if err := p.Pack(uint32(l), s); err != nil {
+		return err
+	}
+	for i := 0; i < l; i++ {
+		if err := p.Pack(arr.Index(i).Interface(), s); err != nil {
+			return err
+		}
+	}
+	// todo 就算长度为0, 也得放个模型进去
+	return nil
+}
+
+func (p *_AnyMsgPacker) WriteAnyMap(msg interface{}, s IByteStream) error {
+	mmap := reflect.ValueOf(msg)
+	l := mmap.Len()
+	if err := p.Pack(uint32(l), s); err != nil {
+		return err
+	}
+	if l <= 0 {
+		return nil
+	}
+	it := mmap.MapRange()
+	for it.Next() {
+		k := it.Key().Interface()
+		v := it.Value().Interface()
+		if err := p.Pack(k, s); err != nil {
+			return err
+		}
+		if err := p.Pack(v, s); err != nil {
+			return err
+		}
 	}
 	return nil
 }

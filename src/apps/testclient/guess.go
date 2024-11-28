@@ -21,12 +21,37 @@ const (
 	RoomType_Chain
 )
 
-func (u *_Module) Chain() (string, map[int]interface{}) {
-	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
-	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
-	fmt.Printf("加入已有房间请输入 [2 房间名字 房间类型] 示例：2 joinroomname  \n")
-	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
+const (
+	ChainStep_NotBegin = iota
+	ChainStep_JoinRoom
+	ChainStep_Ready
+	ChainStep_GameBegin
+)
 
+type _ChainModule struct {
+	nextStage int
+}
+
+func showRoomInfo() {
+	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
+	fmt.Printf("创建空房间请输入 [1 房间名字 房间最大人数] 示例：1 roomname 2 \n")
+	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 roomname  \n")
+	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
+}
+
+func showChainInfo() {
+	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
+	fmt.Printf("您已加入接龙房间, 准备好请输入 5 \n")
+}
+
+// Chain 想要返回任意数量,任意类型的参数. []interface不行, map[Any]interface{} 就行
+func (u *_ChainModule) Chain() (string, map[int]interface{}) {
+	switch u.nextStage {
+	case ChainStep_NotBegin:
+		showRoomInfo()
+	case ChainStep_JoinRoom:
+		showChainInfo()
+	}
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
@@ -42,30 +67,27 @@ func (u *_Module) Chain() (string, map[int]interface{}) {
 	}
 	args := make(map[int]interface{})
 	var methodName string
-	var ret string
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
 		methodName = "CRPC_CreateRoom"
 		args[0] = RoomType_Chain // 房间类型
-		args[1] = cmds[1]        // 房间名字
+		args[1] = cmds[1]        // 房间id
 		args[2] = cmds[2]        // 房间最大人数
 	case JoinRoom:
 		methodName = "CRPC_JoinRoom"
-		args[0] = cmds[1]        // 房间名字
-		args[1] = RoomType_Chain // 房间类型
+		args[0] = cmds[1] // 房间名字
 	case RecommendRoom:
 		methodName = "CRPC_GetRecommendRoom"
-		args[0] = RoomType_Chain // 房间类型
 	case RoomGuessReady:
-		methodName = "CRPC_GuessRoomReady"
+		methodName = "CRPC_ChainRoomReady"
 	case RoomGuessPlay:
-		methodName = "CRPC_GuessRoomSendMsg"
+		methodName = "CRPC_ChainRoomSendMsg"
+		args[0] = cmds[1] // 接龙内容
 	default:
 		fmt.Println(" 参数不对 ")
 		return "", nil
 	}
-	ret = cmds[1]
-	return methodName, ret
+	return methodName, args
 }
 
 func (r *_User) ChainGameTurnBegin(firstKey string) {

@@ -2,6 +2,7 @@ package msg
 
 import (
 	"fmt"
+	"reflect"
 )
 
 // 【消息参数解包文件  []byte 转化为 []interface】
@@ -47,7 +48,43 @@ func (p *_AnyMsgPacker) Unpack(s IByteStream) (interface{}, error) {
 		return s.ReadBool()
 	case argTypeString:
 		return s.ReadString()
+	case argTypeBytes:
+		return s.ReadBytes()
+	case argTypeAnySlice:
+		return p.ReadAnySlice(s)
 	default:
 		return 0, fmt.Errorf("unpack failed, unsupported type %v", argType)
 	}
+}
+
+func (p *_AnyMsgPacker) ReadAnySlice(s IByteStream) (interface{}, error) {
+	length, err := s.ReadUint32()
+	if err != nil {
+		return nil, err
+	}
+	// 先解一个出来看看是什么
+	example, err := p.Unpack(s)
+	if err != nil {
+		return nil, err
+	}
+	rSlice := make([]reflect.Value, 0)
+	if length > 0 {
+		rSlice = append(rSlice, reflect.ValueOf(example))
+		for i := 1; i < int(length); i++ {
+			example, err = p.Unpack(s)
+			if err != nil {
+				return nil, err
+			}
+			rSlice = append(rSlice, reflect.ValueOf(example))
+		}
+	}
+
+	typeOfElement := reflect.TypeOf(example)             // 得到元素类型
+	typeOfElementSlice := reflect.SliceOf(typeOfElement) // 得到[]元素类型
+	elementSlice := reflect.MakeSlice(typeOfElementSlice, 0, 0)
+	elementSliceInterface := elementSlice.Interface() // 这是啥
+	el := reflect.ValueOf(&elementSliceInterface).Elem()
+	val_arr1 := reflect.Append(elementSlice, rSlice...)
+	el.Set(val_arr1)
+	return elementSliceInterface, nil
 }

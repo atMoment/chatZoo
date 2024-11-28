@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type IChatRoom interface {
+	Chat(member, content string) error
+	GetHistoryMsg() []*_ChatRoomMsg
+}
+
 type _ChatRoom struct {
 	IRoomBase
 	msgCache []*_ChatRoomMsg // 消息缓存
@@ -34,7 +39,7 @@ type _ChatRoomMsg struct {
 	sendTime int64
 }
 
-func (r *_ChatRoom) chat(member, content string) error {
+func (r *_ChatRoom) Chat(member, content string) error {
 	if !r.MemberIsExist(member) {
 		return errors.New("member not exist in room")
 	}
@@ -51,6 +56,6 @@ func (r *_ChatRoom) chat(member, content string) error {
 	return nil
 }
 
-func (r *_ChatRoom) getHistoryMsg() []*_ChatRoomMsg {
+func (r *_ChatRoom) GetHistoryMsg() []*_ChatRoomMsg {
 	return r.msgCache
 }

@@ -23,11 +23,23 @@ type _RoomMgr struct {
 	typ   int
 }
 
-func (mgr *_RoomMgr) AddEntity(userID string, typ, limit int) {
-	mgr.rooms.Store(userID, createEntity(typ, limit))
+func (mgr *_RoomMgr) AddEntity(userID string, typ, limit int) (IRoom, error) {
+	if len(userID) == 0 {
+		return nil, errors.New("userid is empty")
+	}
+	_, ok := mgr.rooms.Load(userID)
+	if ok {
+		return nil, errors.New("userid already exist")
+	}
+	room := createEntity(typ, limit)
+	mgr.rooms.Store(userID, room)
+	return room, nil
 }
 
 func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ, limit int) (IRoom, error) {
+	if len(userID) == 0 {
+		return nil, errors.New("userid is empty")
+	}
 	room := createEntity(typ, limit)
 	// 找不到 返回 false
 	entityInfo, ok := mgr.rooms.LoadOrStore(userID, room)
@@ -43,6 +55,9 @@ func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ, limit int) (IRoom, error
 }
 
 func (mgr *_RoomMgr) GetEntity(userID string) (IRoom, error) {
+	if len(userID) == 0 {
+		return nil, errors.New("userid is empty")
+	}
 	entityInfo, ok := mgr.rooms.Load(userID)
 	if !ok {
 		return nil, errors.New("userid not find")
@@ -73,6 +88,17 @@ func (mgr *_RoomMgr) GetEntity(userID string) (IRoom, error) {
 	default:
 		return nil, errors.New("room typ illegal")
 	}
+}
+
+func (mgr *_RoomMgr) TravelRoom() []string {
+	ret := make([]string, 0)
+	f := func(key, value any) bool {
+		id, _ := key.(string)
+		ret = append(ret, id)
+		return true
+	}
+	mgr.rooms.Range(f)
+	return ret
 }
 
 func (mgr *_RoomMgr) DeleteEntity(userID string) {
