@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -72,7 +73,12 @@ func (u *_ChainModule) Chain() (string, map[int]interface{}) {
 		methodName = "CRPC_CreateRoom"
 		args[0] = RoomType_Chain // 房间类型
 		args[1] = cmds[1]        // 房间id
-		args[2] = cmds[2]        // 房间最大人数
+		roomLimit, err := strconv.Atoi(cmds[2])
+		if err != nil {
+			fmt.Println(ModuleNameChat, " create room limit not num ", cmds[2])
+			return "", nil
+		}
+		args[2] = roomLimit // 房间最大人数
 	case JoinRoom:
 		methodName = "CRPC_JoinRoom"
 		args[0] = cmds[1] // 房间名字

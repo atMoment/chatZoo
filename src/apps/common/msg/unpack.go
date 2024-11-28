@@ -38,6 +38,8 @@ func (p *_AnyMsgPacker) Unpack(s IByteStream) (interface{}, error) {
 		return s.ReadUint16()
 	case argTypeInt32:
 		return s.ReadInt32()
+	case argTypeInt:
+		return s.ReadInt()
 	case argTypeUint32:
 		return s.ReadUint32()
 	case argTypeInt64:

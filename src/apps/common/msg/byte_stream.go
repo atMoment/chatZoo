@@ -19,6 +19,7 @@ type IByteStream interface {
 	WriteInt32(v int32) error
 	WriteUint64(v uint64) error
 	WriteInt64(v int64) error
+	WriteInt(v int) error
 	ReadUint8() (uint8, error)
 	ReadInt8() (int8, error)
 	ReadBool() (bool, error)
@@ -28,6 +29,7 @@ type IByteStream interface {
 	ReadInt32() (int32, error)
 	ReadUint64() (uint64, error)
 	ReadInt64() (int64, error)
+	ReadInt() (int, error)
 	WriteString(v string) error
 	ReadString() (string, error)
 	WriteBytes(v []byte) error
@@ -67,22 +69,23 @@ func (bs *ByteStream) ReadLoop(f func(s IByteStream) (interface{}, error)) ([]in
 }
 
 const (
-	_              = iota
-	argTypeInt8    = 1
-	argTypeUint8   = 2
-	argTypeInt16   = 3
-	argTypeUint16  = 4
-	argTypeInt32   = 5
-	argTypeUint32  = 6
-	argTypeInt64   = 7
-	argTypeUint64  = 8
-	argTypeFloat32 = 9
-	argTypeFloat64 = 10
-	argTypeString  = 11
-	argTypeBytes   = 12 // []byte
-	argTypeBool    = 13
-	argTypeNil     = 14
-	argTypeError   = 15
+	_ = iota
+	argTypeInt8
+	argTypeUint8
+	argTypeInt16
+	argTypeUint16
+	argTypeInt32
+	argTypeInt
+	argTypeUint32
+	argTypeInt64
+	argTypeUint64
+	argTypeFloat32
+	argTypeFloat64
+	argTypeString
+	argTypeBytes // []byte
+	argTypeBool
+	argTypeNil
+	argTypeError
 
 	argStreamMsg    = 20
 	argProtoBuffMsg = 21
@@ -127,7 +130,7 @@ func (bs *ByteStream) WriteUint8(v uint8) error {
 
 func (bs *ByteStream) ReadUint8() (uint8, error) {
 	if bs.readPos >= uint32(len(bs.data)) {
-		return 0, errors.New("length not enough")
+		return 0, errors.New("ReadUint8 length not enough")
 	}
 	v := bs.data[bs.readPos]
 	bs.readPos++
@@ -170,7 +173,7 @@ func (bs *ByteStream) WriteUint16(v uint16) error {
 
 func (bs *ByteStream) ReadUint16() (uint16, error) {
 	if bs.readPos+2 > uint32(len(bs.data)) {
-		return 0, errors.New("length not enough")
+		return 0, errors.New("ReadUint16 length not enough")
 	}
 	v := binary.LittleEndian.Uint16(bs.data[bs.readPos : bs.readPos+2])
 	bs.readPos += 2
@@ -197,11 +200,20 @@ func (bs *ByteStream) WriteUint32(v uint32) error {
 
 func (bs *ByteStream) ReadUint32() (uint32, error) {
 	if bs.readPos+4 > uint32(len(bs.data)) {
-		return 0, errors.New("length not enough")
+		return 0, errors.New("ReadUint32 length not enough")
 	}
 	v := binary.LittleEndian.Uint32(bs.data[bs.readPos : bs.readPos+4])
 	bs.readPos += 4
 	return v, nil
+}
+
+func (bs *ByteStream) WriteInt(v int) error {
+	return bs.WriteUint32(uint32(v))
+}
+
+func (bs *ByteStream) ReadInt() (int, error) {
+	v, err := bs.ReadUint32()
+	return int(v), err
 }
 
 func (bs *ByteStream) WriteInt32(v int32) error {
@@ -226,7 +238,7 @@ func (bs *ByteStream) WriteUint64(v uint64) error {
 func (bs *ByteStream) ReadUint64() (uint64, error) {
 	size := uint32(8)
 	if bs.readPos+size > uint32(len(bs.data)) {
-		return 0, errors.New("length not enough")
+		return 0, errors.New("ReadUint64 length not enough")
 	}
 	v := binary.LittleEndian.Uint64(bs.data[bs.readPos : bs.readPos+size])
 	bs.readPos += size

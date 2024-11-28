@@ -132,7 +132,7 @@ func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 	ret.Timeout.Stop()
 	args, unpackErr := mmsg.UnpackArgs(msg.Rets)
 	if unpackErr != nil {
-		ret.Err = errors.New("unpack arg err")
+		ret.Err = fmt.Errorf("unpack arg err:%v", unpackErr)
 	} else {
 		ret.Rets = args
 	}

@@ -93,7 +93,7 @@ func (u *_User) sendLoop() {
 		in := make([]interface{}, len(argMap))
 
 		for i := 0; i < len(argMap); i++ {
-			in[i] = args[i].Interface()
+			in[i] = argMap[i]
 		}
 		// 想要声明一个函数, 函数的返回值是 ...interface, 方便传入 SendReq中。 返回值是真实的类型而不是 真实类型转化后的interface类型
 		ret := <-u.GetRpc().SendReq(methodName, in...)
