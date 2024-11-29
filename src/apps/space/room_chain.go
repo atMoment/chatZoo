@@ -62,24 +62,24 @@ func NewChainRoom(limit int) *_ChainRoom {
 }
 
 // Ready 有玩家准备好时调用
-func (r *_ChainRoom) Ready(player string) {
+func (room *_ChainRoom) Ready(player string) {
 	// 所有人全部ready 游戏自动开始
-	r.readyMap[player] = struct{}{}
-	if len(r.readyMap) == r.GetRoomMemberLimit() {
-		r.start()
+	room.readyMap[player] = struct{}{}
+	if len(room.readyMap) == room.GetRoomMemberLimit() {
+		room.start()
 	}
 }
 
 // Collect 每轮中玩家发言
-func (r *_ChainRoom) Collect(player, content string) {
-	if r.curTurn == r.GetRoomMemberLimit() {
+func (room *_ChainRoom) Collect(player, content string) {
+	if room.curTurn == room.GetRoomMemberLimit() {
 		fmt.Println("轮次结束,不应该发言")
 		return
 	}
 	// 找到这个选手是哪个赛道
 	track := -1
-	for i := 0; i < r.GetRoomMemberLimit(); i++ {
-		if r.turns[i][r.curTurn] == player {
+	for i := 0; i < room.GetRoomMemberLimit(); i++ {
+		if room.turns[i][room.curTurn] == player {
 			track = i
 			break
 		}
@@ -89,75 +89,76 @@ func (r *_ChainRoom) Collect(player, content string) {
 		return
 	}
 
-	r.records[track] = append(r.records[track], &_Record{actor: player, content: content})
-	if !r.canReachNextLevel() {
-		fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,等待其他队伍交棒\n", r.curTurn, track, player, content)
+	room.records[track] = append(room.records[track], &_Record{actor: player, content: content})
+	if !room.canReachNextLevel() {
+		fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,等待其他队伍交棒\n", room.curTurn, track, player, content)
 		return
 	}
-	fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,所有赛道已交棒,进入下一轮次\n", r.curTurn, track, player, content)
+	fmt.Printf("当前轮次:%v, 赛道:%v player:%v已交棒 :%v,所有赛道已交棒,进入下一轮次\n", room.curTurn, track, player, content)
 
-	r.curTurn++
-	r.timer.Reset(gameIntervalDuration)
-	if r.curTurn == r.GetRoomMemberLimit() {
-		r.gameOver()
+	room.curTurn++
+	room.timer.Reset(gameIntervalDuration)
+	if room.curTurn == room.GetRoomMemberLimit() {
+		room.gameOver()
 		return
 	}
 
-	for i := 0; i < r.GetRoomMemberLimit(); i++ {
-		member := r.turns[i][r.curTurn]          // 各自赛道的第x棒选手
-		key := r.records[i][len(r.records[i])-1] // 各自赛道的棒
+	for i := 0; i < room.GetRoomMemberLimit(); i++ {
+		member := room.turns[i][room.curTurn]          // 各自赛道的第x棒选手
+		key := room.records[i][len(room.records[i])-1] // 各自赛道的棒
 		// 通知选手起跑
-		r.NotifyMember(member, "ChainGameTurnBegin", key)
+		room.NotifyMember(member, "SRPC_ChainGameTurnBegin", key)
+		fmt.Printf("下一轮次开始,选手各就位！ 轮次:%v player:%v 关键词:%v\n", room.curTurn, member, key)
 	}
 }
 
-func (r *_ChainRoom) start() {
+func (room *_ChainRoom) start() {
 	var err error
-	r.first, err = getFirstKey(r.GetRoomMemberLimit())
+	room.first, err = getFirstKey(room.GetRoomMemberLimit())
 	if err != nil {
 		panic(fmt.Sprintf("setFirstKey err:%v", err))
 	}
-	r.turns, err = getPlayerTurn(r.GetRoomMemberList())
+	room.turns, err = getPlayerTurn(room.GetRoomMemberList())
 	if err != nil {
 		panic(fmt.Sprintf("getPlayerTurn err:%v", err))
 	}
 
-	r.records = make([][]*_Record, len(r.turns))
-	for i := 0; i < r.GetRoomMemberLimit(); i++ {
-		member := r.turns[i][0] // 各自赛道的第0棒选手
-		firstKey := r.first[i]  // 各自赛道的棒
+	room.records = make([][]*_Record, len(room.turns))
+	for i := 0; i < room.GetRoomMemberLimit(); i++ {
+		member := room.turns[i][0] // 各自赛道的第0棒选手
+		firstKey := room.first[i]  // 各自赛道的棒
 		// 通知选手起跑
-		r.NotifyMember(member, "ChainGameTurnBegin", firstKey)
-		r.records[i] = append(r.records[i], &_Record{
+		room.NotifyMember(member, "SRPC_ChainGameTurnBegin", firstKey)
+		room.records[i] = append(room.records[i], &_Record{
 			actor:   "system",
 			content: firstKey,
 		})
 	}
-	r.timer = time.AfterFunc(gameIntervalDuration, r.dealTimeOut)
-	fmt.Printf("game start firstKey:%v turn:%+v curTurn:%v\n", r.first, r.turns, r.curTurn)
+	room.timer = time.AfterFunc(gameIntervalDuration, room.dealTimeOut)
+	fmt.Printf("game start firstKey:%v turn:%+v curTurn:%v\n", room.first, room.turns, room.curTurn)
 }
 
-func (r *_ChainRoom) dealTimeOut() {
+func (room *_ChainRoom) dealTimeOut() {
 	fmt.Printf("超时期限到,有玩家未回答,游戏结束\n")
-	r.gameOver()
+	room.gameOver()
 }
 
-func (r *_ChainRoom) gameOver() {
-	if r.timer != nil {
-		r.timer.Stop()
-		r.timer = nil
+func (room *_ChainRoom) gameOver() {
+	if room.timer != nil {
+		room.timer.Stop()
+		room.timer = nil
 	}
 	// 告诉所有玩家游戏结果
-	r.NotifyAllMember("ChainGameOver")
-	fmt.Printf("game over, all result:%+v\n", r.records)
+	room.NotifyAllMember("SPRC_ChainGameOver")
+	fmt.Printf("game over, all result:%+v\n", room.records)
 	// todo 触发房间销毁？
 }
 
 // canReachNextLevel 是否可以进入到下一棒
-func (r *_ChainRoom) canReachNextLevel() bool {
+func (room *_ChainRoom) canReachNextLevel() bool {
 	// 检查每一个赛道, 是否都已经交棒
-	for i := 0; i < r.GetRoomMemberLimit(); i++ {
-		if len(r.records[i]) != r.curTurn+2 {
+	for i := 0; i < room.GetRoomMemberLimit(); i++ {
+		if len(room.records[i]) != room.curTurn+2 {
 			return false
 		}
 	}

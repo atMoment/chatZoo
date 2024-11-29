@@ -50,27 +50,11 @@ func (u *_User) destroy() {
 // sendLoop 持续从标准输入中读取, 并发送给服务器
 func (u *_User) sendLoop() {
 	defer func() { u.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
-	moduleList := make([]string, 0)
-	t := reflect.TypeOf(u.module)
-	for i := 0; i < t.NumMethod(); i++ {
-		moduleList = append(moduleList, t.Method(i).Name)
-	}
 
-	// 玩家输入指令
-	var method reflect.Value
-	for {
-		v := reflect.ValueOf(u.module)
-		cmd := showGameHall(u.GetEntityID(), moduleList)
-		method = v.MethodByName(cmd)
-
-		if method.Kind() == reflect.Func && !method.IsNil() { // 进入下一流程
-			break
-		}
-		fmt.Println("模块名不对, 请重新输入 ", cmd)
-	}
+	moduleName, moduleMethod := u.getPlayerInputModuleName()
 
 	for {
-		args := method.Call([]reflect.Value{})
+		args := moduleMethod.Call([]reflect.Value{})
 		if len(args) < 2 {
 			fmt.Println("模块失败, 参数数量错误 ")
 			continue
@@ -98,10 +82,10 @@ func (u *_User) sendLoop() {
 		// 想要声明一个函数, 函数的返回值是 ...interface, 方便传入 SendReq中。 返回值是真实的类型而不是 真实类型转化后的interface类型
 		ret := <-u.GetRpc().SendReq(methodName, in...)
 		if ret.Err != nil {
-			fmt.Println("ret.Err  ", ret.Err)
+			fmt.Println(moduleName, "moduleName ret.Err  ", ret.Err)
 			continue
 		}
-		fmt.Println("get ret ", ret.Rets)
+		fmt.Println(moduleName, " get ret ", ret.Rets)
 	}
 }
 
@@ -116,3 +100,35 @@ func (u *_User) receiveLoop() {
 		}
 	}
 }
+
+// //// 客户端表现模块
+// getModuleName 获取玩家模块输入
+func (u *_User) getPlayerInputModuleName() (string, reflect.Value) {
+	moduleList := make([]string, 0)
+	t := reflect.TypeOf(u.module)
+	for i := 0; i < t.NumMethod(); i++ {
+		moduleList = append(moduleList, t.Method(i).Name)
+	}
+	var method reflect.Value
+	for {
+		v := reflect.ValueOf(u.module)
+		cmd := showGameHall(u.GetEntityID(), moduleList)
+		method = v.MethodByName(cmd)
+
+		if method.Kind() == reflect.Func && !method.IsNil() { // 进入下一流程
+			return cmd, method
+		}
+		fmt.Println("模块名不对, 请重新输入 ", cmd)
+	}
+}
+
+/*
+想要的结果, 显示推荐房间、创建房间、加入房间
+只允许玩家发送1,2,3
+玩家选择了2 和 3, 发到服务器成功了, 进入到下一个阶段
+                发到服务器失败了, 再次显示这个
+
+下一个阶段, 提示玩家准备
+只允许玩家发送5, 发到服务器成功了, 进入到下一个阶段
+下一个阶段, 等待通知开始后, 输入 6 内容
+*/

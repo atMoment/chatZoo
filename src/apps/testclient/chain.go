@@ -96,11 +96,11 @@ func (u *_ChainModule) Chain() (string, map[int]interface{}) {
 	return methodName, args
 }
 
-func (r *_User) ChainGameTurnBegin(firstKey string) {
+func (r *_User) SRPC_ChainGameTurnBegin(firstKey string) {
 	fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", firstKey)
 }
 
-func (r *_User) ChainGameOver() {
+func (r *_User) SPRC_ChainGameOver() {
 	fmt.Println("guess game over")
 }
 
