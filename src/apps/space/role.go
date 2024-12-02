@@ -45,8 +45,8 @@ func (r *_User) CRPC_CreateRoom(typ int, roomID string, limit int) string {
 	return "success"
 }
 
-func (r *_User) CRPC_GetRecommendRoom() []string {
-	return roomMgr.TravelRoom()
+func (r *_User) CRPC_GetRecommendRoom() (string, []string) {
+	return "success", roomMgr.TravelRoom()
 }
 func (r *_User) CRPC_QuitRoom(roomID string) string {
 	return "success"

@@ -50,63 +50,98 @@ func showRoomInfo() {
 	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
 }
 
-func showChainReady() {
-	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
-	fmt.Printf("您已加入接龙房间, 游戏即将开始, 准备好请输入 5 \n")
-}
-
 func (u *ChainModule) Chain() {
-	for {
-		u.selectRoom()
-		if u.nextStage == ChainStep_Ready {
-			break
-		}
-	}
-}
-
-// SetNextStage 设置阶段
-func (u *ChainModule) setNextStage(methodName string) error {
-	switch methodName {
-	case "CRPC_GetRecommendRoom":
-		u.nextStage = ChainStep_NotBegin
-	case "CRPC_CreateRoom", "CRPC_JoinRoom":
-		u.nextStage = ChainStep_JoinRoom
-	case "CRPC_ChainRoomReady":
-		u.nextStage = ChainStep_Ready
-	case "CRPC_ChainRoomSendMsg":
-		u.nextStage = ChainStep_GameBegin
-	default:
-		return fmt.Errorf("unsupported methodName%v, can't trans stage", methodName)
-	}
-	return nil
+	u.selectRoom()
+	u.readyRoom()
 }
 
 func (u *ChainModule) selectRoom() {
+loop:
 	for {
 		showRoomInfo()
-		err, cmds := waitPlayerInput(3)
+		err, cmds := waitPlayerInput(0)
 		if err != nil {
 			fmt.Printf("selectRoom input err:%v\n", err)
 			continue
 		}
 		switch cmds[0] {
 		case CreateRoom: // 创建房间
+			if len(cmds) < 3 {
+				fmt.Println(" create room cmd length not match ", len(cmds))
+				continue
+			}
 			roomLimit, AtoiErr := strconv.Atoi(cmds[2])
 			if AtoiErr != nil {
 				fmt.Println(ModuleNameChat, " create room limit not num ", cmds[2])
 				continue
 			}
-			u.createRoom(cmds[1], roomLimit)
+			err = u.createRoom(cmds[1], roomLimit)
+			if err != nil {
+				fmt.Println("create room err ", err)
+				continue
+			}
+			break loop
 		case JoinRoom:
-			u.joinRoom(cmds[1])
+			if len(cmds) < 2 {
+				fmt.Println(" join room cmd length not match ", len(cmds))
+				continue
+			}
+			err = u.joinRoom(cmds[1])
+			if err != nil {
+				fmt.Println("join room err ", err)
+				continue
+			}
+			break loop
 		case RecommendRoom:
-			u.recommendRoom()
+			err = u.recommendRoom()
+			if err != nil {
+				fmt.Println("recommend room err ", err)
+			}
+		default:
+			fmt.Println("unsupported cmd ", cmds[0])
 		}
 	}
 }
 
 func (u *ChainModule) readyRoom() {
-	// CRPC_ChainRoomReady
+	for {
+		fmt.Println("this is chain module, 输入指令后回车换行结束 ")
+		fmt.Printf("您已加入接龙房间, 游戏即将开始, 准备好请输入 任意字符 \n")
+		err, _ := waitPlayerInput(1)
+		if err != nil {
+			fmt.Printf("selectRoom input err:%v\n", err)
+			continue
+		}
+		methodName := "CRPC_ChainRoomReady"
+		ret := <-u.user.GetRpc().SendReq(methodName)
+		err = analyseRpcReqRet(ret)
+		if err != nil {
+			fmt.Printf("chainStart methodName:%v req err:%v  \n", methodName, err)
+			continue
+		}
+		break
+	}
+}
+
+func (u *ChainModule) chainStart(key string) {
+	for {
+		fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", key)
+		fmt.Printf("请输入 接龙内容 \n")
+
+		err, cmds := waitPlayerInput(1)
+		if err != nil {
+			fmt.Printf("chainStart input err:%v\n", err)
+			continue
+		}
+
+		methodName := "CRPC_ChainRoomSendMsg"
+		ret := <-u.user.GetRpc().SendReq(methodName, cmds[0])
+		err = analyseRpcReqRet(ret)
+		if err != nil {
+			fmt.Printf("chainStart methodName:%v req err:%v  \n", methodName, err)
+			continue
+		}
+	}
 }
 
 func (u *ChainModule) createRoom(roomid string, limit int) error {
@@ -134,27 +169,6 @@ func (u *ChainModule) recommendRoom() error {
 	}
 	fmt.Println("recommend room: ", recommendList)
 	return nil
-}
-
-func (u *ChainModule) chainStart(key string) {
-	for {
-		fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", key)
-		fmt.Printf("请输入 接龙内容 \n")
-
-		err, cmds := waitPlayerInput(1)
-		if err != nil {
-			fmt.Printf("chainStart input err:%v\n", err)
-			continue
-		}
-
-		methodName := "CRPC_ChainRoomSendMsg"
-		ret := <-u.user.GetRpc().SendReq(methodName, cmds[0])
-		err = analyseRpcReqRet(ret)
-		if err != nil {
-			fmt.Printf("chainStart methodName:%v req err:%v  \n", methodName, err)
-			continue
-		}
-	}
 }
 
 func (r *_User) SRPC_ChainGameTurnBegin(key string) {
@@ -191,8 +205,10 @@ func waitPlayerInput(cmdLength int) (error, []string) {
 
 	// 把字符串中的\r\n筛选出来
 	cmds := filterSeparator(input)
-	if len(cmds) != cmdLength {
-		return fmt.Errorf("输入长度不匹配"), nil
+	if cmdLength != 0 {
+		if len(cmds) != cmdLength {
+			return fmt.Errorf("输入长度不匹配"), nil
+		}
 	}
 	return nil, cmds
 }
