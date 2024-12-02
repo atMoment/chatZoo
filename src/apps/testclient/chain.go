@@ -1,7 +1,9 @@
 package main
 
 import (
+	"ChatZoo/common"
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -29,8 +31,16 @@ const (
 	ChainStep_GameBegin
 )
 
-type _ChainModule struct {
+type ChainModule struct {
 	nextStage int
+	key       string
+	user      *_User
+}
+
+func NewChainModule(user *_User) *ChainModule {
+	return &ChainModule{
+		user: user,
+	}
 }
 
 func showRoomInfo() {
@@ -40,68 +50,151 @@ func showRoomInfo() {
 	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
 }
 
-func showChainInfo() {
+func showChainReady() {
 	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
-	fmt.Printf("您已加入接龙房间, 准备好请输入 5 \n")
+	fmt.Printf("您已加入接龙房间, 游戏即将开始, 准备好请输入 5 \n")
 }
 
-// Chain 想要返回任意数量,任意类型的参数. []interface不行, map[Any]interface{} 就行
-func (u *_ChainModule) Chain() (string, map[int]interface{}) {
-	switch u.nextStage {
-	case ChainStep_NotBegin:
-		showRoomInfo()
-	case ChainStep_JoinRoom:
-		showChainInfo()
-	}
-	inputReader := bufio.NewReader(os.Stdin)
-	input, inputErr := inputReader.ReadString('\n') // 回车
-	if inputErr != nil {
-		fmt.Println(ModuleNameChat, " os.stdin read err ", inputErr)
-		return "", nil
-	}
-
-	// 把字符串中的\r\n筛选出来
-	cmds := filterSeparator(input)
-	if len(cmds) == 0 {
-		fmt.Println(ModuleNameChat, " 无有效输入, 长度不对 ", len(cmds))
-		return "", nil
-	}
-	args := make(map[int]interface{})
-	var methodName string
-	switch cmds[0] {
-	case CreateRoom: // 创建房间
-		methodName = "CRPC_CreateRoom"
-		args[0] = RoomType_Chain // 房间类型
-		args[1] = cmds[1]        // 房间id
-		roomLimit, err := strconv.Atoi(cmds[2])
-		if err != nil {
-			fmt.Println(ModuleNameChat, " create room limit not num ", cmds[2])
-			return "", nil
+func (u *ChainModule) Chain() {
+	for {
+		u.selectRoom()
+		if u.nextStage == ChainStep_Ready {
+			break
 		}
-		args[2] = roomLimit // 房间最大人数
-	case JoinRoom:
-		methodName = "CRPC_JoinRoom"
-		args[0] = cmds[1] // 房间名字
-	case RecommendRoom:
-		methodName = "CRPC_GetRecommendRoom"
-	case RoomGuessReady:
-		methodName = "CRPC_ChainRoomReady"
-	case RoomGuessPlay:
-		methodName = "CRPC_ChainRoomSendMsg"
-		args[0] = cmds[1] // 接龙内容
-	default:
-		fmt.Println(" 参数不对 ")
-		return "", nil
 	}
-	return methodName, args
 }
 
-func (r *_User) SRPC_ChainGameTurnBegin(firstKey string) {
-	fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", firstKey)
+// SetNextStage 设置阶段
+func (u *ChainModule) setNextStage(methodName string) error {
+	switch methodName {
+	case "CRPC_GetRecommendRoom":
+		u.nextStage = ChainStep_NotBegin
+	case "CRPC_CreateRoom", "CRPC_JoinRoom":
+		u.nextStage = ChainStep_JoinRoom
+	case "CRPC_ChainRoomReady":
+		u.nextStage = ChainStep_Ready
+	case "CRPC_ChainRoomSendMsg":
+		u.nextStage = ChainStep_GameBegin
+	default:
+		return fmt.Errorf("unsupported methodName%v, can't trans stage", methodName)
+	}
+	return nil
+}
+
+func (u *ChainModule) selectRoom() {
+	for {
+		showRoomInfo()
+		err, cmds := waitPlayerInput(3)
+		if err != nil {
+			fmt.Printf("selectRoom input err:%v\n", err)
+			continue
+		}
+		switch cmds[0] {
+		case CreateRoom: // 创建房间
+			roomLimit, AtoiErr := strconv.Atoi(cmds[2])
+			if AtoiErr != nil {
+				fmt.Println(ModuleNameChat, " create room limit not num ", cmds[2])
+				continue
+			}
+			u.createRoom(cmds[1], roomLimit)
+		case JoinRoom:
+			u.joinRoom(cmds[1])
+		case RecommendRoom:
+			u.recommendRoom()
+		}
+	}
+}
+
+func (u *ChainModule) readyRoom() {
+	// CRPC_ChainRoomReady
+}
+
+func (u *ChainModule) createRoom(roomid string, limit int) error {
+	methodName := "CRPC_CreateRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName, RoomType_Chain, roomid, limit)
+	return analyseRpcReqRet(ret)
+}
+
+func (u *ChainModule) joinRoom(roomid string) error {
+	methodName := "CRPC_JoinRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName, roomid)
+	return analyseRpcReqRet(ret)
+}
+
+func (u *ChainModule) recommendRoom() error {
+	methodName := "CRPC_GetRecommendRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName)
+	err := analyseRpcReqRet(ret)
+	if err != nil {
+		return err
+	}
+	recommendList, ok := ret.Rets[1].([]string)
+	if !ok {
+		return fmt.Errorf("not []string")
+	}
+	fmt.Println("recommend room: ", recommendList)
+	return nil
+}
+
+func (u *ChainModule) chainStart(key string) {
+	for {
+		fmt.Println("guess game turn begin, 请以此字符串的结尾作为开头组成成语/俗语 ", key)
+		fmt.Printf("请输入 接龙内容 \n")
+
+		err, cmds := waitPlayerInput(1)
+		if err != nil {
+			fmt.Printf("chainStart input err:%v\n", err)
+			continue
+		}
+
+		methodName := "CRPC_ChainRoomSendMsg"
+		ret := <-u.user.GetRpc().SendReq(methodName, cmds[0])
+		err = analyseRpcReqRet(ret)
+		if err != nil {
+			fmt.Printf("chainStart methodName:%v req err:%v  \n", methodName, err)
+			continue
+		}
+	}
+}
+
+func (r *_User) SRPC_ChainGameTurnBegin(key string) {
+	r.module.ChainModule.chainStart(key)
 }
 
 func (r *_User) SPRC_ChainGameOver() {
 	fmt.Println("guess game over")
+}
+
+func analyseRpcReqRet(ret *common.CallRet) error {
+	if ret.Err != nil {
+		return ret.Err
+	}
+	if len(ret.Rets) == 0 {
+		return errors.New("ret.Rets length is 0")
+	}
+	errStr, ok := ret.Rets[0].(string)
+	if !ok {
+		return errors.New("ret.Rets[0] not string")
+	}
+	if errStr != "success" {
+		return fmt.Errorf("ret err:%v", errStr)
+	}
+	return nil
+}
+
+func waitPlayerInput(cmdLength int) (error, []string) {
+	inputReader := bufio.NewReader(os.Stdin)
+	input, inputErr := inputReader.ReadString('\n') // 回车
+	if inputErr != nil {
+		return inputErr, nil
+	}
+
+	// 把字符串中的\r\n筛选出来
+	cmds := filterSeparator(input)
+	if len(cmds) != cmdLength {
+		return fmt.Errorf("输入长度不匹配"), nil
+	}
+	return nil, cmds
 }
 
 // filterSeparator 过滤分隔符"1 room \r\n" 转化为 "1 room", 再转化为[]string{"1", "room"}

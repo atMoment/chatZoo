@@ -12,9 +12,8 @@ const (
 	CreateRoom     = "1"
 	JoinRoom       = "2"
 	RecommendRoom  = "3"
-	ChatRoom       = "4"
-	RoomGuessReady = "5"
-	RoomGuessPlay  = "6"
+	RoomGuessReady = "4"
+	ChatRoom       = "101"
 )
 
 func (u *_Module) Chat() (string, string) {
@@ -63,8 +62,6 @@ func (u *_Module) Chat() (string, string) {
 		methodName = "ChatRoom"
 	case RoomGuessReady:
 		methodName = "GuessRoomReady"
-	case RoomGuessPlay:
-		methodName = "GuessRoomSendMsg"
 	default:
 		fmt.Println(ModuleNameChat, " 参数不对 ")
 		return "", ""

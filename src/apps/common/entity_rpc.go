@@ -12,7 +12,7 @@ import (
 
 type IEntityRpc interface {
 	SendNotify(methodName string, arg ...interface{}) error
-	SendReq(methodName string, methodArgs ...interface{}) chan *_CallRet
+	SendReq(methodName string, methodArgs ...interface{}) chan *CallRet
 	ReceiveConn() error
 }
 
@@ -28,12 +28,12 @@ func NewEntityRpc(entity IEntityInfo) IEntityRpc {
 	}
 }
 
-type _CallRet struct {
+type CallRet struct {
 	Rets []interface{}
 	//RetData []byte
 	Err     error
-	Done    chan *_CallRet // 为什么像俄罗斯套娃？ 因为sync要保存结构体, 在rsp来之前要把 timeout写进去, 仅存 channel 做不了
-	Timeout *time.Timer    // 不能无限等待返回
+	Done    chan *CallRet // 为什么像俄罗斯套娃？ 因为sync要保存结构体, 在rsp来之前要把 timeout写进去, 仅存 channel 做不了
+	Timeout *time.Timer   // 不能无限等待返回
 }
 
 func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
@@ -49,9 +49,9 @@ func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
 	return err
 }
 
-func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan *_CallRet {
-	ret := &_CallRet{
-		Done: make(chan *_CallRet, 1), // make(chan *_CallRet) 就没有返回, 为什么？
+func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan *CallRet {
+	ret := &CallRet{
+		Done: make(chan *CallRet, 1), // make(chan *CallRet) 就没有返回, 为什么？
 	}
 
 	args, err := mmsg.PackArgs(methodArgs...)
@@ -128,7 +128,7 @@ func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 	if !ok {
 		return errors.New("过期的回复")
 	}
-	ret, _ := r.(*_CallRet)
+	ret, _ := r.(*CallRet)
 	ret.Timeout.Stop()
 	args, unpackErr := mmsg.UnpackArgs(msg.Rets)
 	if unpackErr != nil {

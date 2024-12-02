@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -89,7 +92,11 @@ Loop:
 		return
 	}
 	defer user.destroy()
-	user.play()
+	go user.play()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+	<-c
 }
 
 func waitLoginResp(conn net.Conn) error {
