@@ -7,18 +7,21 @@ type IEntityInfo interface {
 	GetEntityID() string
 	GetRpc() IEntityRpc
 	SetRpc(entity IEntityInfo)
+	GetRpcQueue() IEntityRpcQueue
 }
 
 type EntityInfo struct {
 	entityID string
 	conn     net.Conn
 	rpc      IEntityRpc
+	rpcQueue IEntityRpcQueue
 }
 
 func NewEntityInfo(entityID string, conn net.Conn) *EntityInfo {
 	self := &EntityInfo{
 		entityID: entityID,
 		conn:     conn,
+		rpcQueue: NewRpcQueue(),
 	}
 	return self
 }
@@ -37,4 +40,8 @@ func (e *EntityInfo) GetEntityID() string {
 
 func (e *EntityInfo) GetRpc() IEntityRpc {
 	return e.rpc
+}
+
+func (e *EntityInfo) GetRpcQueue() IEntityRpcQueue {
+	return e.rpcQueue
 }

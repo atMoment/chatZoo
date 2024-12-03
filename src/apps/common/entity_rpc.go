@@ -13,7 +13,9 @@ import (
 type IEntityRpc interface {
 	SendNotify(methodName string, arg ...interface{}) error
 	SendReq(methodName string, methodArgs ...interface{}) chan *CallRet
+	SingleCall(methodName string, args ...interface{}) error
 	ReceiveConn() error
+	SendRsp(index int32, methodRets ...interface{}) error
 }
 
 type _EntityRpc struct {
@@ -123,6 +125,36 @@ func (s *_EntityRpc) ReceiveConn() error {
 	return nil
 }
 
+func (s *_EntityRpc) SingleCall(methodName string, args ...interface{}) error {
+	v := reflect.ValueOf(s.entity)
+	method := v.MethodByName(methodName)
+	if method.Kind() != reflect.Func || method.IsNil() {
+		return fmt.Errorf("can't find methodName %v", methodName)
+	}
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		in[i] = reflect.ValueOf(arg)
+	}
+	s.entity.GetRpcQueue().Push(0, method, in) // 并发安全
+	return nil
+}
+
+func (s *_EntityRpc) SendRsp(index int32, methodRets ...interface{}) error {
+	args, err := mmsg.PackArgs(methodRets...)
+	if err != nil {
+		return fmt.Errorf("pack rets err %v", err)
+	}
+	msg := &mmsg.MsgCmdRsp{
+		Rets:  args,
+		Index: index,
+	}
+	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
+	if err != nil {
+		return fmt.Errorf("write to conn err %v", err)
+	}
+	return nil
+}
+
 func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 	r, ok := s.waitRetRpc.Load(msg.Index)
 	if !ok {
@@ -157,7 +189,8 @@ func (s *_EntityRpc) receiveNotify(msg *mmsg.MsgNotify) error {
 	for i, arg := range args {
 		in[i] = reflect.ValueOf(arg)
 	}
-	method.Call(in) // todo 这是并发不安全的, 需要改一下
+	s.entity.GetRpcQueue().Push(0, method, in) // 并发安全
+	//method.Call(in) // todo 这是并发不安全的, 需要改一下
 	return nil
 }
 
@@ -180,26 +213,15 @@ func (s *_EntityRpc) receiveReq(msg *mmsg.MsgCmdReq) error {
 			fmt.Printf("Call panic, methodName:%v err:%v, arg:%v\n", msg.MethodName, err, args)
 		}
 	}()
-	rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
-	out := make([]interface{}, len(rets))
-	for i, ret := range rets {
-		out[i] = ret.Interface()
-	}
-	return s.sendRsp(msg.Index, out...)
-}
-
-func (s *_EntityRpc) sendRsp(index int32, methodRets ...interface{}) error {
-	args, err := mmsg.PackArgs(methodRets...)
-	if err != nil {
-		return fmt.Errorf("pack rets err %v", err)
-	}
-	msg := &mmsg.MsgCmdRsp{
-		Rets:  args,
-		Index: index,
-	}
-	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
-	if err != nil {
-		return fmt.Errorf("write to conn err %v", err)
-	}
+	s.entity.GetRpcQueue().Push(msg.Index, method, in) // 并发安全
 	return nil
+
+	/*
+		rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
+		out := make([]interface{}, len(rets))
+		for i, ret := range rets {
+			out[i] = ret.Interface()
+		}
+		return s.sendRsp(msg.Index, out...)
+	*/
 }

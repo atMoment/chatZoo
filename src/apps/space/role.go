@@ -25,7 +25,13 @@ func (r *_User) CRPC_JoinRoom(roomID string) string {
 		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
 		return "failed"
 	}
-	room.JoinRoom(r.GetEntityID())
+	entity, ok := room.(common.IEntityInfo)
+	if !ok {
+		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
+		return "failed"
+	}
+	entity.GetRpc().SingleCall("JoinRoom", r.GetEntityID())
+	//room.JoinRoom(r.GetEntityID())
 	r.joinRoomID = roomID
 	r.joinRoomType = room.GetType()
 	fmt.Printf("CRPC_JoinRoom success  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
@@ -38,7 +44,13 @@ func (r *_User) CRPC_CreateRoom(typ int, roomID string, limit int) string {
 		fmt.Printf("%v CRPC_CreateRoom add entity err:%v \n", r.GetEntityID(), err)
 		return "failed"
 	}
-	room.JoinRoom(r.GetEntityID())
+	entity, ok := room.(common.IEntityInfo)
+	if !ok {
+		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
+		return "failed"
+	}
+	entity.GetRpc().SingleCall("JoinRoom", r.GetEntityID())
+	//room.JoinRoom(r.GetEntityID())
 	r.joinRoomID = roomID
 	r.joinRoomType = typ
 	fmt.Printf("CRPC_CreateRoom success  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)

@@ -52,21 +52,51 @@ func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup, cache
 	return s
 }
 
+// 这里处理不了了,开始狗屎起来
 func (s *_Session) procLoop() {
-	s.wg.Add(1)
+	s.wg.Add(2)
 	defer func() {
 		fmt.Println("goroutine : session proc exit", s.conn.RemoteAddr())
 		s.conn.Close()
-		s.wg.Done() // 给父亲发信号
 	}()
 	// 为什么不用 writeConn(), 因为目前有些问题没法解决
-	s.readConn() // 只管从网卡读取数据放到缓冲区去
-
+	go s.readConn() // 只管从网卡读取数据放到缓冲区去
+	go s.dealQueue()
 	//go s.sendHeartbeat()
+}
+
+// dealQueue 从队列中读并支持
+func (s *_Session) dealQueue() {
+	// 从队列中取出来, 如果队列是空的,阻塞.   队列中有值了再唤醒
+	// 用channel 怎么实现？
+	// 如果阻塞中发了新号,怎么让它走到s.ctx.Done() 退出？
+	defer s.wg.Done()
+	for {
+		select {
+		case <-s.ctx.Done():
+			fmt.Println("session dealQueue receive exit signal")
+			return
+		default:
+		}
+		if s.user != nil {
+			rets, index := s.user.GetRpcQueue().Pop()
+			if index != 0 {
+				out := make([]interface{}, len(rets))
+				for i, ret := range rets {
+					out[i] = ret.Interface()
+				}
+				err := s.user.GetRpc().SendRsp(index, out...)
+				if err != nil {
+					fmt.Println("send rsp err:", err)
+				}
+			}
+		}
+	}
 }
 
 // readConn 从套接字里持续不断地读
 func (s *_Session) readConn() {
+	defer s.wg.Done()
 	for {
 		select {
 		case <-s.ctx.Done():

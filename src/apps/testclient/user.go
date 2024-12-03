@@ -40,6 +40,7 @@ func (u *_User) play() {
 	go u.receiveLoop()
 	go u.sendLoop()
 	u.wg.Wait()
+	fmt.Println("play over")
 }
 
 func (u *_User) destroy() {
@@ -49,7 +50,7 @@ func (u *_User) destroy() {
 // 震惊！ conn直接复制可行
 // sendLoop 持续从标准输入中读取, 并发送给服务器
 func (u *_User) sendLoop() {
-	defer func() { u.wg.Done(); fmt.Println(" receiveFromStdinAndWrite over") }()
+	defer func() { u.wg.Done(); fmt.Println("sendLoop over") }()
 
 	moduleMethod := u.getPlayerInputModuleName()
 	moduleMethod.Call([]reflect.Value{})
@@ -57,7 +58,7 @@ func (u *_User) sendLoop() {
 
 // receiveLoop 持续接收来自服务器的消息
 func (u *_User) receiveLoop() {
-	defer func() { u.wg.Done(); fmt.Println(" receiveLoop over") }()
+	defer func() { u.wg.Done(); fmt.Println("receiveLoop over") }()
 	for {
 		err := u.GetRpc().ReceiveConn()
 		if err != nil {

@@ -26,11 +26,11 @@ const (
 	gameIntervalDuration = 5 * time.Minute
 )
 
-/*
-流程
-
-
-*/
+const (
+	ChainPhase_NotBegin = iota
+	ChainPhase_Begin
+	ChainPhase_End
+)
 
 type IChainRoom interface {
 	Ready(player string)
@@ -46,7 +46,9 @@ type _ChainRoom struct {
 	records  [][]*_Record        // i 赛道  j:某一棒选手表现
 	curTurn  int                 // 当前到第几棒
 	timer    *time.Timer
+	phase    int // 阶段
 }
+
 type _Record struct {
 	actor   string
 	content string
@@ -63,10 +65,15 @@ func NewChainRoom(limit int) *_ChainRoom {
 
 // Ready 有玩家准备好时调用
 func (room *_ChainRoom) Ready(player string) {
+	if room.phase != ChainPhase_NotBegin {
+		fmt.Println("phase not illegal")
+		return
+	}
 	// 所有人全部ready 游戏自动开始
 	room.readyMap[player] = struct{}{}
 	if len(room.readyMap) == room.GetRoomMemberLimit() {
 		room.start()
+		room.phase = ChainPhase_Begin
 	}
 }
 
