@@ -38,6 +38,10 @@ type CallRet struct {
 	Timeout *time.Timer   // 不能无限等待返回
 }
 
+func (s *_EntityRpc) String() string {
+	return fmt.Sprintf("[entityRpc :%v]", s.entity.GetEntityID())
+}
+
 func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
 	args, err := mmsg.PackArgs(arg...)
 	if err != nil {
@@ -94,7 +98,7 @@ func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan 
 func (s *_EntityRpc) ReceiveConn() error {
 	msg, err := mmsg.ReadFromConn(s.entity.GetNetConn())
 	if err != nil {
-		fmt.Println("session handleConnect conn read err ", err)
+		fmt.Println(s, " ReadFromConn ", err)
 		return err
 	}
 	before := time.Now()
