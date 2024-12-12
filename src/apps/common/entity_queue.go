@@ -23,6 +23,7 @@ type _RpcQueue struct {
 	firstNode *_RpcCell
 	length    int
 	lock      sync.Mutex
+	cond      *sync.Cond
 }
 
 type _RpcCell struct {
@@ -33,25 +34,31 @@ type _RpcCell struct {
 }
 
 func NewRpcQueue() IEntityRpcQueue {
-	return &_RpcQueue{
+	ret := &_RpcQueue{
 		lock: sync.Mutex{},
 	}
+	ret.cond = sync.NewCond(&ret.lock)
+	return ret
 }
 
 func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value) {
 	// 插入的时候如果满了, 采取的方案是不再接收, 但这肯定不是最好的方案
-	q.lock.Lock()
-	defer q.lock.Unlock()
+	q.cond.L.Lock()
+	defer func() {
+		q.cond.L.Unlock()
+		q.cond.Signal()
+	}()
 	if q.length == QueueMacLength {
-		fmt.Println("queue full, drop it, can't push", method.Interface())
-		return
+		fmt.Println("q.length is max")
+		q.cond.Wait()
 	}
 	newNode := &_RpcCell{
 		method: method,
 		args:   args,
+		Index:  index,
 	}
 	q.length++
-	if q.length == 0 {
+	if q.length == 1 {
 		q.firstNode = newNode
 		return
 	}
@@ -63,18 +70,21 @@ func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value
 	n.next = newNode
 }
 func (q *_RpcQueue) Pop() ([]reflect.Value, int32) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
+	q.cond.L.Lock()
+	defer func() {
+		q.cond.L.Unlock()
+		q.cond.Signal()
+	}()
 	if q.length == 0 {
-		//fmt.Println("queue is empty, can't pop")
-		return nil, 0
+		fmt.Println("q.length is 0")
+		q.cond.Wait()
 	}
-	q.length--
 	method := q.firstNode.method
 	args := q.firstNode.args
 	msgIndex := q.firstNode.Index
 
 	q.firstNode = q.firstNode.next
+	q.length--
 	before := time.Now()
 	rets := method.Call(args)
 	after := time.Now()

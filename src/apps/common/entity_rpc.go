@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -130,8 +131,7 @@ func (s *_EntityRpc) ReceiveConn() error {
 }
 
 func (s *_EntityRpc) SingleCall(methodName string, args ...interface{}) error {
-	v := reflect.ValueOf(s.entity)
-	method := v.MethodByName(methodName)
+	method := s.analyseMethodName(methodName)
 	if method.Kind() != reflect.Func || method.IsNil() {
 		return fmt.Errorf("can't find methodName %v", methodName)
 	}
@@ -228,4 +228,16 @@ func (s *_EntityRpc) receiveReq(msg *mmsg.MsgCmdReq) error {
 		}
 		return s.sendRsp(msg.Index, out...)
 	*/
+}
+
+func (s *_EntityRpc) analyseMethodName(methodName string) reflect.Value {
+	rets := strings.Split(methodName, ".")
+	if len(rets) == 1 {
+		return reflect.ValueOf(s.entity).MethodByName(methodName)
+	}
+	component := s.entity.GetComponent(rets[0])
+	if component.IsNil() {
+		panic(fmt.Sprintf("component name illegal  :%v", rets[0]))
+	}
+	return reflect.ValueOf(component).MethodByName(rets[1])
 }
