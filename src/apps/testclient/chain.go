@@ -141,6 +141,7 @@ func (u *ChainModule) chainStart(key string) {
 			fmt.Printf("chainStart methodName:%v req err:%v  \n", methodName, err)
 			continue
 		}
+		return
 	}
 }
 
@@ -172,6 +173,7 @@ func (u *ChainModule) recommendRoom() error {
 }
 
 func (r *_User) SRPC_ChainGameTurnBegin(key string) {
+	fmt.Printf("SRPC_ChainGameTurnBegin r:%v key:%v\n", r.GetEntityID(), key)
 	r.module.ChainModule.chainStart(key)
 }
 

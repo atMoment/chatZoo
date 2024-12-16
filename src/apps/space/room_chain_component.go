@@ -24,6 +24,7 @@ import (
 */
 const (
 	gameIntervalDuration = 5 * time.Minute
+	ComponentChain       = "ComponentChain"
 )
 
 const (
@@ -32,13 +33,13 @@ const (
 	ChainPhase_End
 )
 
-type IChainRoom interface {
+type IChainComponent interface {
 	Ready(player string)
 	Collect(player, content string)
 }
 
-// 接龙房间
-type _ChainRoom struct {
+// 接龙组件
+type _ChainComponent struct {
 	IRoomBase
 	readyMap map[string]struct{} // key: 已经准备好的选手
 	turns    [][]string          // i: 某赛道的接棒选手们, j: 要接第几棒的选手
@@ -54,17 +55,16 @@ type _Record struct {
 	content string
 }
 
-func NewChainRoom(limit int) *_ChainRoom {
-	chainRoom := &_ChainRoom{
-		IRoomBase: NewRoom(limit),
+func NewChainComponent(room IRoomBase) *_ChainComponent {
+	ChainComponent := &_ChainComponent{
+		IRoomBase: room,
 		readyMap:  make(map[string]struct{}),
 	}
-	chainRoom.SetType(RoomType_Chain)
-	return chainRoom
+	return ChainComponent
 }
 
 // Ready 有玩家准备好时调用
-func (room *_ChainRoom) Ready(player string) {
+func (room *_ChainComponent) Ready(player string) {
 	if room.phase != ChainPhase_NotBegin {
 		fmt.Println("phase not illegal")
 		return
@@ -78,7 +78,7 @@ func (room *_ChainRoom) Ready(player string) {
 }
 
 // Collect 每轮中玩家发言
-func (room *_ChainRoom) Collect(player, content string) {
+func (room *_ChainComponent) Collect(player, content string) {
 	if room.curTurn == room.GetRoomMemberLimit() {
 		fmt.Println("轮次结束,不应该发言")
 		return
@@ -119,7 +119,7 @@ func (room *_ChainRoom) Collect(player, content string) {
 	}
 }
 
-func (room *_ChainRoom) start() {
+func (room *_ChainComponent) start() {
 	var err error
 	room.first, err = getFirstKey(room.GetRoomMemberLimit())
 	if err != nil {
@@ -135,7 +135,10 @@ func (room *_ChainRoom) start() {
 		member := room.turns[i][0] // 各自赛道的第0棒选手
 		firstKey := room.first[i]  // 各自赛道的棒
 		// 通知选手起跑
-		room.NotifyMember(member, "SRPC_ChainGameTurnBegin", firstKey)
+		err = room.NotifyMember(member, "SRPC_ChainGameTurnBegin", firstKey)
+		if err != nil {
+			fmt.Printf("NotifyMember :%v err:%v\n", member, err)
+		}
 		room.records[i] = append(room.records[i], &_Record{
 			actor:   "system",
 			content: firstKey,
@@ -145,12 +148,12 @@ func (room *_ChainRoom) start() {
 	fmt.Printf("game start firstKey:%v turn:%+v curTurn:%v\n", room.first, room.turns, room.curTurn)
 }
 
-func (room *_ChainRoom) dealTimeOut() {
+func (room *_ChainComponent) dealTimeOut() {
 	fmt.Printf("超时期限到,有玩家未回答,游戏结束\n")
 	room.gameOver()
 }
 
-func (room *_ChainRoom) gameOver() {
+func (room *_ChainComponent) gameOver() {
 	if room.timer != nil {
 		room.timer.Stop()
 		room.timer = nil
@@ -162,7 +165,7 @@ func (room *_ChainRoom) gameOver() {
 }
 
 // canReachNextLevel 是否可以进入到下一棒
-func (room *_ChainRoom) canReachNextLevel() bool {
+func (room *_ChainComponent) canReachNextLevel() bool {
 	// 检查每一个赛道, 是否都已经交棒
 	for i := 0; i < room.GetRoomMemberLimit(); i++ {
 		if len(room.records[i]) != room.curTurn+2 {

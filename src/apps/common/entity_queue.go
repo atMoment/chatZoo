@@ -76,7 +76,6 @@ func (q *_RpcQueue) Pop() ([]reflect.Value, int32) {
 		q.cond.Signal()
 	}()
 	if q.length == 0 {
-		fmt.Println("q.length is 0")
 		q.cond.Wait()
 	}
 	method := q.firstNode.method
@@ -88,7 +87,7 @@ func (q *_RpcQueue) Pop() ([]reflect.Value, int32) {
 	before := time.Now()
 	rets := method.Call(args)
 	after := time.Now()
-	if after.Sub(before).Milliseconds() > time.Duration(1*time.Second).Milliseconds() {
+	if after.Sub(before).Milliseconds() > time.Duration(2000*time.Second).Milliseconds() {
 		fmt.Println("exec func too slow ", after.Sub(before).Milliseconds())
 	}
 	return rets, msgIndex

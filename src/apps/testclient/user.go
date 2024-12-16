@@ -9,7 +9,8 @@ import (
 )
 
 type _User struct {
-	wg *sync.WaitGroup
+	stopCh chan struct{}
+	wg     *sync.WaitGroup
 	common.IEntityInfo
 	module *_Module
 }
@@ -38,8 +39,11 @@ func (u *_User) play() {
 	// 试过wg.Add(1) 放到子协程开始, 但是主协程可能等不到子协程开始就执行wg.Wait(),然后就结束程序了
 	u.wg.Add(2)
 	go u.receiveLoop()
+	go u.dealLoop()
 	go u.sendLoop()
 	u.wg.Wait()
+	u.stopCh <- struct{}{}
+
 	fmt.Println("play over")
 }
 
@@ -64,6 +68,17 @@ func (u *_User) receiveLoop() {
 		if err != nil {
 			fmt.Println("common.ReadFromConn err", err)
 			return
+		}
+	}
+}
+
+func (u *_User) dealLoop() {
+	for {
+		select {
+		case <-u.stopCh:
+			return
+		default:
+			u.GetRpcQueue().Pop() // todo 需要等待处理完
 		}
 	}
 }

@@ -1,119 +1,83 @@
 package main
 
 import (
+	"ChatZoo/common"
 	"errors"
-	"sync"
+	"time"
 )
 
-// 一些特别简单的狗屎代码
-const (
-	RoomType_None = iota
-	RoomType_Chat
-	RoomType_Chain
-)
-
-type IRoom interface {
-	IRoomBase
+type IRoomBase interface {
+	JoinRoom(member string) error
+	QuitRoom(member string)
+	MemberIsExist(member string) bool
+	GetRoomMemberList() []string // 只能读
+	GetRoomMemberLimit() int     // 只能读
+	NotifyAllMember(methodName string, args ...interface{})
+	NotifyMember(member string, methodName string, args ...interface{}) error
 }
 
-var roomMgr = &_RoomMgr{}
+// todo 还有创建销毁, load/unload 逻辑
 
-type _RoomMgr struct {
-	rooms sync.Map // key: roomID val: room
-	typ   int
+type _Room struct {
+	common.IRoomEntity
+	memberList map[string]struct{}
+	limit      int
+	createTime int64
+	entityID   string
 }
 
-func (mgr *_RoomMgr) AddEntity(userID string, typ, limit int) (IRoom, error) {
-	if len(userID) == 0 {
-		return nil, errors.New("userid is empty")
+func NewRoom(entityID string, limit int) *_Room {
+	self := &_Room{
+		entityID:    entityID,
+		limit:       limit,
+		createTime:  time.Now().Unix(),
+		memberList:  make(map[string]struct{}),
+		IRoomEntity: common.NewRoomEntity(entityID),
 	}
-	_, ok := mgr.rooms.Load(userID)
-	if ok {
-		return nil, errors.New("userid already exist")
-	}
-	room := createEntity(typ, limit)
-	mgr.rooms.Store(userID, room)
-	return room, nil
+	return self
 }
 
-func (mgr *_RoomMgr) AddOrGetEntity(userID string, typ, limit int) (IRoom, error) {
-	if len(userID) == 0 {
-		return nil, errors.New("userid is empty")
-	}
-	room := createEntity(typ, limit)
-	// 找不到 返回 false
-	entityInfo, ok := mgr.rooms.LoadOrStore(userID, room)
-	if !ok {
-		return room, nil
-	}
+func (r *_Room) destroy() {}
 
-	ret, transOk := entityInfo.(IRoom)
-	if !transOk {
-		return nil, errors.New("trans userinfo err")
+func (r *_Room) JoinRoom(member string) error {
+	if len(r.memberList) == int(r.limit) {
+		return errors.New("room full")
 	}
-	return ret, nil
+	r.memberList[member] = struct{}{}
+	return nil
 }
 
-func (mgr *_RoomMgr) GetEntity(userID string) (IRoom, error) {
-	if len(userID) == 0 {
-		return nil, errors.New("userid is empty")
-	}
-	entityInfo, ok := mgr.rooms.Load(userID)
-	if !ok {
-		return nil, errors.New("userid not find")
-	}
-	ret, ok := entityInfo.(IRoom)
-	if !ok {
-		return nil, errors.New("trans userinfo err")
-	}
-	switch ret.GetType() {
-	case RoomType_None:
-		entity, roomOk := entityInfo.(*_Room)
-		if !roomOk {
-			return entity, errors.New("can't trans room")
-		}
-		return entity, nil
-	case RoomType_Chat:
-		entity, roomOk := entityInfo.(*_ChatRoom)
-		if !roomOk {
-			return entity, errors.New("can't trans chat room")
-		}
-		return entity, nil
-	case RoomType_Chain:
-		entity, roomOk := entityInfo.(*_ChainRoom)
-		if !roomOk {
-			return entity, errors.New("can't trans chain room")
-		}
-		return entity, nil
-	default:
-		return nil, errors.New("room typ illegal")
-	}
+func (r *_Room) QuitRoom(member string) {
+	delete(r.memberList, member)
 }
 
-func (mgr *_RoomMgr) TravelRoom() []string {
-	ret := make([]string, 0)
-	f := func(key, value any) bool {
-		id, _ := key.(string)
-		ret = append(ret, id)
-		return true
+func (r *_Room) MemberIsExist(member string) bool {
+	_, ok := r.memberList[member]
+	return ok
+}
+
+func (r *_Room) GetRoomMemberLimit() int {
+	return r.limit
+}
+
+func (r *_Room) GetRoomMemberList() []string {
+	ret := make([]string, len(r.memberList))
+	var i int
+	for m := range r.memberList {
+		ret[i] = m
+		i++
 	}
-	mgr.rooms.Range(f)
 	return ret
 }
 
-func (mgr *_RoomMgr) DeleteEntity(userID string) {
-	mgr.rooms.Delete(userID)
+func (r *_Room) NotifyAllMember(methodName string, args ...interface{}) {
+	common.DefaultSrvEntity.SendNotifyToEntityList(r.memberList, methodName, args...)
 }
 
-func createEntity(typ int, limit int) IRoom {
-	var room IRoom
-	switch typ {
-	case RoomType_Chain:
-		room = NewChainRoom(limit)
-	case RoomType_Chat:
-		room = NewChatRoom(limit)
-	default:
-		room = NewRoom(limit)
+func (r *_Room) NotifyMember(member string, methodName string, args ...interface{}) error {
+	if _, ok := r.memberList[member]; !ok {
+		return errors.New("member not in room")
 	}
-	return room
+	common.DefaultSrvEntity.SendNotifyToEntity(member, methodName, args...)
+	return nil
 }

@@ -53,6 +53,7 @@ func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
 		Args:       args,
 	}
 	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
+	fmt.Printf("SendNotify methodName :%v \n", methodName)
 	return err
 }
 
@@ -179,6 +180,7 @@ func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 }
 
 func (s *_EntityRpc) receiveNotify(msg *mmsg.MsgNotify) error {
+	fmt.Println("[lcc] receiveNotify ", msg.MethodName)
 	v := reflect.ValueOf(s.entity)
 	method := v.MethodByName(msg.MethodName)
 	if method.Kind() != reflect.Func || method.IsNil() {

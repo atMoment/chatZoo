@@ -9,8 +9,7 @@ import (
 // 设计上一个玩家只能加入一个房间
 type _User struct {
 	*common.EntityInfo
-	joinRoomID   string
-	joinRoomType int
+	joinRoomID string
 }
 
 func NewUser(entityID string, conn net.Conn) (*_User, error) {
@@ -25,15 +24,17 @@ func (r *_User) CRPC_JoinRoom(roomID string) string {
 		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
 		return "failed"
 	}
-	entity, ok := room.(common.IEntityInfo)
+	entity, ok := room.(common.IRoomEntity)
 	if !ok {
 		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
 		return "failed"
 	}
-	entity.GetRpc().SingleCall("JoinRoom", r.GetEntityID())
-	//room.JoinRoom(r.GetEntityID())
+	err = entity.SingleCall(ComponentBase+".PlayerJoinRoom", r.GetEntityID())
+	if err != nil {
+		fmt.Printf("%v single call failed, err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
 	r.joinRoomID = roomID
-	r.joinRoomType = room.GetType()
 	fmt.Printf("CRPC_JoinRoom success  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
 	return "success"
 }
@@ -44,15 +45,17 @@ func (r *_User) CRPC_CreateRoom(typ int, roomID string, limit int) string {
 		fmt.Printf("%v CRPC_CreateRoom add entity err:%v \n", r.GetEntityID(), err)
 		return "failed"
 	}
-	entity, ok := room.(common.IEntityInfo)
+	entity, ok := room.(common.IRoomEntity)
 	if !ok {
 		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
 		return "failed"
 	}
-	entity.GetRpc().SingleCall("JoinRoom", r.GetEntityID())
-	//room.JoinRoom(r.GetEntityID())
+	err = entity.SingleCall(ComponentBase+".PlayerJoinRoom", r.GetEntityID())
+	if err != nil {
+		fmt.Printf("%v single call failed, err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
 	r.joinRoomID = roomID
-	r.joinRoomType = typ
 	fmt.Printf("CRPC_CreateRoom success  userid:%v, roomid:%v \n ", r.GetEntityID(), roomID)
 	return "success"
 }
@@ -61,6 +64,7 @@ func (r *_User) CRPC_GetRecommendRoom() (string, []string) {
 	return "success", roomMgr.TravelRoom()
 }
 func (r *_User) CRPC_QuitRoom(roomID string) string {
+	// todo complete me
 	return "success"
 }
 
@@ -70,12 +74,16 @@ func (r *_User) CRPC_ChainRoomReady() string {
 		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
 		return "failed"
 	}
-	ir, ok := room.(IChainRoom)
+	entity, ok := room.(common.IRoomEntity)
 	if !ok {
-		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
+		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
 		return "failed"
 	}
-	ir.Ready(r.GetEntityID())
+	err = entity.SingleCall(ComponentChain+".Ready", r.GetEntityID())
+	if err != nil {
+		fmt.Printf("%v single call failed, err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
 	fmt.Printf("CRPC_GuessRoomReady success userid:%v, roomid:%v \n ", r.GetEntityID(), r.joinRoomID)
 	return "success"
 }
@@ -86,12 +94,16 @@ func (r *_User) CRPC_ChainRoomSendMsg(content string) string {
 		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
 		return "failed"
 	}
-	ir, ok := room.(IChainRoom)
+	entity, ok := room.(common.IRoomEntity)
 	if !ok {
-		fmt.Printf("%v CRPC_JoinRoom get entity err:%v\n ", r.GetEntityID(), err)
+		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
 		return "failed"
 	}
-	ir.Collect(r.GetEntityID(), content)
+	err = entity.SingleCall(ComponentChain+".Collect", r.GetEntityID(), content)
+	if err != nil {
+		fmt.Printf("%v single call failed, err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
 	fmt.Printf("CRPC_GuessRoomSendMsg success  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), r.joinRoomID, content)
 	return "success"
 }
@@ -102,16 +114,12 @@ func (r *_User) CRPC_ChatRoomSendMsg(content string) string {
 		fmt.Printf("%v CRPC_ChatRoomSendMsg get entity err:%v\n ", r.GetEntityID(), err)
 		return "failed"
 	}
-	ir, ok := room.(IChatRoom)
+	entity, ok := room.(common.IRoomEntity)
 	if !ok {
-		fmt.Printf("%v CRPC_ChatRoomSendMsg trans failed\n ", r.GetEntityID())
+		fmt.Printf("%v room can't trans entity\n ", r.GetEntityID())
 		return "failed"
 	}
-	err = ir.Chat(r.GetEntityID(), content)
-	if err != nil {
-		fmt.Printf("%v CRPC_ChatRoomSendMsg chat err:%v\n ", r.GetEntityID(), err)
-		return "failed"
-	}
+	entity.SingleCall(ComponentChat+".Chat", r.GetEntityID(), content)
 	fmt.Printf("CRPC_ChatRoomSendMsg success  userid:%v, roomid:%v content:%v\n ", r.GetEntityID(), r.joinRoomID, content)
 	return "success"
 }
