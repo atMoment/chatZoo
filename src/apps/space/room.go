@@ -3,66 +3,10 @@ package main
 import (
 	"ChatZoo/common"
 	"errors"
-	"sync"
 	"time"
 )
 
-// 一些特别简单的狗屎代码
-const (
-	_ = iota
-	chat
-	guess
-)
-
-var roomMgr = &_RoomMgr{}
-
-type _RoomMgr struct {
-	rooms sync.Map // key: roomID val: room
-	typ   int
-}
-
-func (mgr *_RoomMgr) AddEntity(userID string) {
-	room := &_Room{
-		createTime: time.Now().UnixNano(),
-	}
-	mgr.rooms.Store(userID, room)
-}
-
-func (mgr *_RoomMgr) AddOrGetEntity(userID string) (*_Room, error) {
-	room := &_Room{
-		createTime: time.Now().UnixNano(),
-		memberList: make(map[string]struct{}),
-	}
-	// 找不到 返回 false
-	entityInfo, ok := mgr.rooms.LoadOrStore(userID, room)
-	if !ok {
-		return room, nil
-	}
-
-	ret, transOk := entityInfo.(*_Room)
-	if !transOk {
-		return nil, errors.New("trans userinfo err")
-	}
-	return ret, nil
-}
-
-func (mgr *_RoomMgr) GetEntity(userID string) (*_Room, error) {
-	entityInfo, ok := mgr.rooms.Load(userID)
-	if !ok {
-		return nil, errors.New("userid not find")
-	}
-	ret, ok := entityInfo.(*_Room)
-	if !ok {
-		return nil, errors.New("trans userinfo err")
-	}
-	return ret, nil
-}
-
-func (mgr *_RoomMgr) DeleteEntity(userID string) {
-	mgr.rooms.Delete(userID)
-}
-
-type IRoom interface {
+type IRoomBase interface {
 	JoinRoom(member string) error
 	QuitRoom(member string)
 	MemberIsExist(member string) bool
@@ -75,17 +19,25 @@ type IRoom interface {
 // todo 还有创建销毁, load/unload 逻辑
 
 type _Room struct {
+	common.IRoomEntity
 	memberList map[string]struct{}
 	limit      int
 	createTime int64
+	entityID   string
 }
 
-func NewRoom(limit int) IRoom {
-	return &_Room{
-		limit:      limit,
-		createTime: time.Now().Unix(),
+func NewRoom(entityID string, limit int) *_Room {
+	self := &_Room{
+		entityID:    entityID,
+		limit:       limit,
+		createTime:  time.Now().Unix(),
+		memberList:  make(map[string]struct{}),
+		IRoomEntity: common.NewRoomEntity(entityID),
 	}
+	return self
 }
+
+func (r *_Room) destroy() {}
 
 func (r *_Room) JoinRoom(member string) error {
 	if len(r.memberList) == int(r.limit) {

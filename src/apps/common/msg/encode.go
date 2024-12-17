@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-// 消息结构体编码文件
+// 【消息结构体解码文件  (msg.go 定义的消息结构体) struct 转化为 []byte】
 
 // 目前支持 bool, string, []byte, struct, int
 

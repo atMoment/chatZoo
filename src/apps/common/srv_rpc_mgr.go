@@ -34,7 +34,11 @@ func (s *_RpcMgr) SendNotifyToEntityList(userIds map[string]struct{}, methodName
 			fmt.Println("RpcToEntityList value not _EntityInfo")
 			return false
 		}
-		entity.GetRpc().SendNotify(methodName, arg...)
+		err := entity.GetRpc().SendNotify(methodName, arg...)
+		if err != nil {
+			fmt.Printf("SendNotify err:%v, methodName:%v args:%v id:%v \n", err, methodName, arg, entity.GetEntityID())
+			return false
+		}
 		return true
 	}
 	s.TravelMgr(f)
@@ -55,7 +59,10 @@ func (s *_RpcMgr) SendNotifyToEntity(userid string, methodName string, arg ...in
 			fmt.Println("RpcToEntityList value not _EntityInfo")
 			return false
 		}
-		entity.GetRpc().SendNotify(methodName, arg...)
+		err := entity.GetRpc().SendNotify(methodName, arg...)
+		if err != nil {
+			fmt.Printf("SendNotify err:%v, methodName:%v args:%v id:%v \n", err, methodName, arg, entity.GetEntityID())
+		}
 		return false // 退出循环
 	}
 	s.TravelMgr(f)

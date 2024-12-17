@@ -8,6 +8,7 @@ const (
 type _ChatZooServerConfig struct {
 	App    map[string]_AppConfig
 	Common _CommonConfig
+	Logic  _LogicConfig
 }
 
 type _AppConfig struct {
@@ -19,6 +20,10 @@ type _AppConfig struct {
 type _CommonConfig struct {
 	Mysql MysqlConfig `json:"mysql"`
 	Redis RedisConfig `json:"redis"`
+}
+
+type _LogicConfig struct {
+	Logic map[string]interface{} `json:"logic"`
 }
 
 type MysqlConfig struct {

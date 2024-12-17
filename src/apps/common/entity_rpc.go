@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,8 +13,10 @@ import (
 
 type IEntityRpc interface {
 	SendNotify(methodName string, arg ...interface{}) error
-	SendReq(methodName string, methodArgs ...interface{}) chan *_CallRet
+	SendReq(methodName string, methodArgs ...interface{}) chan *CallRet
+	SingleCall(methodName string, args ...interface{}) error
 	ReceiveConn() error
+	SendRsp(index int32, methodRets ...interface{}) error
 }
 
 type _EntityRpc struct {
@@ -28,12 +31,16 @@ func NewEntityRpc(entity IEntityInfo) IEntityRpc {
 	}
 }
 
-type _CallRet struct {
+type CallRet struct {
 	Rets []interface{}
 	//RetData []byte
 	Err     error
-	Done    chan *_CallRet // 为什么像俄罗斯套娃？ 因为sync要保存结构体, 在rsp来之前要把 timeout写进去, 仅存 channel 做不了
-	Timeout *time.Timer    // 不能无限等待返回
+	Done    chan *CallRet // 为什么像俄罗斯套娃？ 因为sync要保存结构体, 在rsp来之前要把 timeout写进去, 仅存 channel 做不了
+	Timeout *time.Timer   // 不能无限等待返回
+}
+
+func (s *_EntityRpc) String() string {
+	return fmt.Sprintf("[entityRpc :%v]", s.entity.GetEntityID())
 }
 
 func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
@@ -49,9 +56,9 @@ func (s *_EntityRpc) SendNotify(methodName string, arg ...interface{}) error {
 	return err
 }
 
-func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan *_CallRet {
-	ret := &_CallRet{
-		Done: make(chan *_CallRet, 1), // make(chan *_CallRet) 就没有返回, 为什么？
+func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan *CallRet {
+	ret := &CallRet{
+		Done: make(chan *CallRet, 1), // make(chan *CallRet) 就没有返回, 为什么？
 	}
 
 	args, err := mmsg.PackArgs(methodArgs...)
@@ -92,7 +99,7 @@ func (s *_EntityRpc) SendReq(methodName string, methodArgs ...interface{}) chan 
 func (s *_EntityRpc) ReceiveConn() error {
 	msg, err := mmsg.ReadFromConn(s.entity.GetNetConn())
 	if err != nil {
-		fmt.Println("session handleConnect conn read err ", err)
+		fmt.Println(s, " ReadFromConn ", err)
 		return err
 	}
 	before := time.Now()
@@ -123,16 +130,45 @@ func (s *_EntityRpc) ReceiveConn() error {
 	return nil
 }
 
+func (s *_EntityRpc) SingleCall(methodName string, args ...interface{}) error {
+	method := s.analyseMethodName(methodName)
+	if method.Kind() != reflect.Func || method.IsNil() {
+		return fmt.Errorf("can't find methodName %v", methodName)
+	}
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		in[i] = reflect.ValueOf(arg)
+	}
+	s.entity.GetRpcQueue().Push(0, method, in) // 并发安全
+	return nil
+}
+
+func (s *_EntityRpc) SendRsp(index int32, methodRets ...interface{}) error {
+	args, err := mmsg.PackArgs(methodRets...)
+	if err != nil {
+		return fmt.Errorf("pack rets err %v", err)
+	}
+	msg := &mmsg.MsgCmdRsp{
+		Rets:  args,
+		Index: index,
+	}
+	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
+	if err != nil {
+		return fmt.Errorf("write to conn err %v", err)
+	}
+	return nil
+}
+
 func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {
 	r, ok := s.waitRetRpc.Load(msg.Index)
 	if !ok {
 		return errors.New("过期的回复")
 	}
-	ret, _ := r.(*_CallRet)
+	ret, _ := r.(*CallRet)
 	ret.Timeout.Stop()
 	args, unpackErr := mmsg.UnpackArgs(msg.Rets)
 	if unpackErr != nil {
-		ret.Err = errors.New("unpack arg err")
+		ret.Err = fmt.Errorf("unpack arg err:%v", unpackErr)
 	} else {
 		ret.Rets = args
 	}
@@ -157,7 +193,8 @@ func (s *_EntityRpc) receiveNotify(msg *mmsg.MsgNotify) error {
 	for i, arg := range args {
 		in[i] = reflect.ValueOf(arg)
 	}
-	method.Call(in) // todo 这是并发不安全的, 需要改一下
+	s.entity.GetRpcQueue().Push(0, method, in) // 并发安全
+	//method.Call(in) // todo 这是并发不安全的, 需要改一下
 	return nil
 }
 
@@ -175,26 +212,32 @@ func (s *_EntityRpc) receiveReq(msg *mmsg.MsgCmdReq) error {
 	for i, arg := range args {
 		in[i] = reflect.ValueOf(arg)
 	}
-	rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
-	out := make([]interface{}, len(rets))
-	for i, ret := range rets {
-		out[i] = ret.Interface()
-	}
-	return s.sendRsp(msg.Index, out...)
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("Call panic, methodName:%v err:%v, arg:%v\n", msg.MethodName, err, args)
+		}
+	}()
+	s.entity.GetRpcQueue().Push(msg.Index, method, in) // 并发安全
+	return nil
+
+	/*
+		rets := method.Call(in) // todo 这是并发不安全的, 需要改一下
+		out := make([]interface{}, len(rets))
+		for i, ret := range rets {
+			out[i] = ret.Interface()
+		}
+		return s.sendRsp(msg.Index, out...)
+	*/
 }
 
-func (s *_EntityRpc) sendRsp(index int32, methodRets ...interface{}) error {
-	args, err := mmsg.PackArgs(methodRets...)
-	if err != nil {
-		return fmt.Errorf("pack rets err %v", err)
+func (s *_EntityRpc) analyseMethodName(methodName string) reflect.Value {
+	rets := strings.Split(methodName, ".")
+	if len(rets) == 1 {
+		return reflect.ValueOf(s.entity).MethodByName(methodName)
 	}
-	msg := &mmsg.MsgCmdRsp{
-		Rets:  args,
-		Index: index,
+	component := s.entity.GetComponent(rets[0])
+	if component.IsNil() {
+		panic(fmt.Sprintf("component name illegal  :%v", rets[0]))
 	}
-	err = mmsg.WriteToConn(s.entity.GetNetConn(), msg)
-	if err != nil {
-		return fmt.Errorf("write to conn err %v", err)
-	}
-	return nil
+	return reflect.ValueOf(component).MethodByName(rets[1])
 }

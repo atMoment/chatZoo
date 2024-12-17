@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -42,55 +45,66 @@ const (
 )
 
 func main() {
-	client := NewClient()
-	isRegister, isLogin, isVisitor, openID, pwd := client.userLoginInput()
-	client.isVisitor = isVisitor
-	err := client.sendLoginHttp(isRegister, isLogin, isVisitor, openID, pwd)
+	openid, conn, err := userLogin()
 	if err != nil {
-		fmt.Println("send login http err ", err)
+		fmt.Println(err)
 		return
-	}
-
-	conn, err := net.Dial("tcp", client.gateAddr)
-	if err != nil {
-		fmt.Printf("net.Dial err:%v gateAddr:%v\n", err, client.gateAddr)
-		return
-	}
-
-	err = client.sendLoginTcp(conn)
-	if err != nil {
-		fmt.Println("send login tcp err ", err)
-		return
-	}
-	overTimer := time.NewTicker(5 * time.Second)
-Loop:
-	for {
-		select {
-		case <-overTimer.C:
-			fmt.Println("wait login rsp over time")
-			overTimer.Stop()
-			return
-		default:
-			err = waitLoginResp(conn)
-			overTimer.Stop()
-			if err != nil {
-				fmt.Println("wait login rsp err ", err)
-				return
-			} else {
-				break Loop
-			}
-		}
 	}
 	//等待login返回成功再创建
-	user := NewUser(client.openID, conn)
+	user := NewUser(openid, conn)
 	if user == nil {
 		fmt.Println("user 登录失败")
 		conn.Close()
 		return
 	}
 	defer user.destroy()
-	user.play()
+	go user.play()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+	<-c
 }
+
+func userLogin() (string, net.Conn, error) {
+	client := NewClient()
+	isRegister, isLogin, isVisitor, openID, pwd := client.userLoginInput()
+
+	if err := client.sendLoginHttp(isRegister, isLogin, isVisitor, openID, pwd); err != nil {
+		return "", nil, fmt.Errorf("login http err :%v", err)
+	}
+
+	conn, err := net.Dial("tcp", client.gateAddr)
+	if err != nil {
+		return "", nil, fmt.Errorf("net.Dial err:%v gateAddr:%v", err, client.gateAddr)
+	}
+
+	if err = client.sendLoginTcp(conn); err != nil {
+		return "", nil, fmt.Errorf("login tcp err:%v", err)
+	}
+	return client.openID, conn, nil
+}
+
+/*
+错误案例。 超时检测不能同层级,会被阻塞。 这里同层级, 会一直阻塞在 default, 不会走到循环中,更不会走到<-overTimer.C
+我的方案是用上一层级控制超时
+	overTimer := time.NewTicker(1 * time.Second)
+Loop:
+	for {
+		select {
+		case <-overTimer.C:
+			overTimer.Stop()
+			return
+		default:
+			io.ReadFull(conn, sizeBuf)
+			overTimer.Stop()
+			if err != nil {
+				return
+			} else {
+				break Loop
+			}
+		}
+	}
+*/
 
 func waitLoginResp(conn net.Conn) error {
 	msg, err := mmsg.ReadFromConn(conn)
@@ -101,18 +115,21 @@ func waitLoginResp(conn net.Conn) error {
 	if msg.GetID() != mmsg.MsgID_UserLoginResp {
 		return fmt.Errorf("before login, receive other type msg:%v", msg.GetID())
 	}
-	ret, _ := msg.(*mmsg.MsgUserLoginResp)
-	if len(ret.Err) != 0 {
-		return errors.New(ret.Err)
+	resp, _ := msg.(*mmsg.MsgUserLoginResp)
+	if len(resp.Err) != 0 {
+		return errors.New(resp.Err)
 	}
 	return nil
 }
 
-func showGameHall() string {
-	fmt.Println("welcome to chatZoo, this is game hall. we support some game ")
+func showGameHall(openid string, moduleList []string) string {
+	fmt.Printf("%s welcome to chatZoo, this is game hall. we support some game ", openid)
 	fmt.Println("[ > w < ]. [ * v * ]. [ /// - /// ]. [ ` ~ ` ]. [ :) ] ")
 	var moduleName string
-	fmt.Printf("[%v] [%v]\n", ModuleNameChat, ModuleNameFourOperationCalculate)
+	for _, v := range moduleList {
+		fmt.Printf(" [%v] ", v)
+	}
+	fmt.Printf("\n")
 	fmt.Println("请输入选择的模块")
 	fmt.Scanln(&moduleName)
 	return moduleName
@@ -178,8 +195,9 @@ func (s *_Client) userLoginInput() (bool, bool, bool, string, string) {
 			}
 			fmt.Printf("当前账号名字输入为：%v, 此为无效输入\n", openID)
 		}
-	case visitor: // 游客没有openID
+	case visitor: // 游客是随机生成的openID
 		isVisitor = true
+		openID = encrypt.NewGUID()
 	}
 	return isRegister, isLogin, isVisitor, openID, pwd
 }
@@ -206,6 +224,7 @@ func (s *_Client) sendLoginHttp(isRegister, isLogin, isVisitor bool, openID, pwd
 	if isVisitor {
 		url += "/login"
 		req := login.LoginReq{
+			ID:        openID,
 			IsVisitor: true,
 			PublicKey: clientPublicKey.String(),
 		}
@@ -251,17 +270,46 @@ func (s *_Client) sendLoginHttp(isRegister, isLogin, isVisitor bool, openID, pwd
 	s.clientPublicKey = clientPublicKey.String()
 	s.communicationSecretKey = encrypt.Key(clientPrivateKey, serverPublicKey).String()
 	s.openID = openID
+	s.isVisitor = isVisitor
 	return nil
 }
 
 func (s *_Client) sendLoginTcp(conn net.Conn) error {
-	if s.isVisitor {
-		s.openID = conn.LocalAddr().String()
-	}
-	err := mmsg.WriteToConn(conn, &mmsg.MsgUserLogin{
+	// todo 先等回复再发送请求,万一发出请求后回复得很快, 代码还没有执行到等待回复,岂不是就错过了
+	// 但这怎么写呢？
+	if err := mmsg.WriteToConn(conn, &mmsg.MsgUserLogin{
 		OpenID:    s.openID,
 		IsVisitor: s.isVisitor,
 		PublicKey: s.clientPublicKey,
-	})
-	return err
+	}); err != nil {
+		return err
+	}
+
+	overTimer := time.NewTicker(20 * time.Second)
+	respCh := make(chan string, 1)
+	go func() {
+		err := waitLoginResp(conn) // 父协程超时/读取回复失败/
+		var errStr string
+		if err != nil {
+			errStr = err.Error()
+		}
+		respCh <- errStr
+		close(respCh)
+		fmt.Println("wait login resp exit ", err)
+	}()
+
+	select {
+	case <-overTimer.C:
+		overTimer.Stop()
+		conn.Close()
+		return fmt.Errorf("wait login tcp resp over time")
+	case errStr := <-respCh:
+		overTimer.Stop()
+		if len(errStr) > 0 {
+			conn.Close()
+			return fmt.Errorf("login tcp resp err:%v", errStr)
+		}
+	}
+
+	return nil
 }

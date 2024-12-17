@@ -52,6 +52,9 @@ func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 	case int32:
 		s.WriteUint8(argTypeInt32)
 		s.WriteInt32(m)
+	case int:
+		s.WriteUint8(argTypeInt)
+		s.WriteInt(m)
 	case uint64:
 		s.WriteUint8(argTypeUint64)
 		s.WriteUint64(m)
@@ -64,8 +67,76 @@ func (p *_AnyMsgPacker) Pack(msg interface{}, s IByteStream) error {
 	case string:
 		s.WriteUint8(argTypeString)
 		s.WriteString(m)
+	case []byte:
+		s.WriteUint8(argTypeBytes)
+		s.WriteBytes(m)
 	default:
-		return fmt.Errorf("pack failed, unsupported type:%v typeName:%v, msg:%v", m, reflect.TypeOf(msg).Name(), m)
+		kind := reflect.TypeOf(m).Kind()
+		if kind == reflect.Slice {
+			s.WriteUint8(argTypeAnySlice)
+			p.WriteAnySlice(m, s)
+		} else {
+			return fmt.Errorf("pack failed, unsupported type:%v typeName:%v, msg:%v", m, reflect.TypeOf(msg).Name(), m)
+		}
+	}
+	return nil
+}
+
+func (p *_AnyMsgPacker) WriteAnySlice(msg interface{}, s IByteStream) error {
+	arr := reflect.ValueOf(msg)
+	l := arr.Len()
+	s.WriteUint32(uint32(l)) // 最多4G
+	if l > 0 {
+
+		for i := 0; i < l; i++ {
+			if err := p.Pack(arr.Index(i).Interface(), s); err != nil {
+				return err
+			}
+		}
+	} else {
+
+		//if nil slice,write a example elem
+		elType := reflect.TypeOf(msg).Elem()
+		examEl := NewPackValueType(elType)
+		err := p.Pack(examEl, s)
+		if err != nil {
+			return fmt.Errorf("write nil slice example error:%v", err)
+		}
+	}
+	// todo 就算长度为0, 也得放个模型进去
+	return nil
+}
+
+// NewPackValueType 反射创建对象。基础类型用实例，struct必须是指针
+func NewPackValueType(elType reflect.Type) interface{} {
+	if elType.Kind() == reflect.Ptr {
+		elType = elType.Elem()
+		v := reflect.New(elType).Interface()
+		return v
+	}
+	v := reflect.New(elType).Elem().Interface()
+	return v
+}
+
+func (p *_AnyMsgPacker) WriteAnyMap(msg interface{}, s IByteStream) error {
+	mmap := reflect.ValueOf(msg)
+	l := mmap.Len()
+	if err := p.Pack(uint32(l), s); err != nil {
+		return err
+	}
+	if l <= 0 {
+		return nil
+	}
+	it := mmap.MapRange()
+	for it.Next() {
+		k := it.Key().Interface()
+		v := it.Value().Interface()
+		if err := p.Pack(k, s); err != nil {
+			return err
+		}
+		if err := p.Pack(v, s); err != nil {
+			return err
+		}
 	}
 	return nil
 }
