@@ -114,7 +114,7 @@ func (room *_ChainComponent) Collect(player, content string) {
 		member := room.turns[i][room.curTurn]          // 各自赛道的第x棒选手
 		key := room.records[i][len(room.records[i])-1] // 各自赛道的棒
 		// 通知选手起跑
-		room.NotifyMember(member, "SRPC_ChainGameTurnBegin", key)
+		room.NotifyMember(member, "SRPC_ChainGameTurnBegin", key.content)
 		fmt.Printf("下一轮次开始,选手各就位！ 轮次:%v player:%v 关键词:%v\n", room.curTurn, member, key)
 	}
 }
@@ -160,8 +160,14 @@ func (room *_ChainComponent) gameOver() {
 	}
 	// 告诉所有玩家游戏结果
 	room.NotifyAllMember("SPRC_ChainGameOver")
-	fmt.Printf("game over, all result:%+v\n", room.records)
-	// todo 触发房间销毁？
+	fmt.Printf("game over\n")
+	for i, show := range room.records {
+		fmt.Printf("赛道 i :%v \n", i)
+		for _, v := range show {
+			fmt.Printf("- 选手:%v 内容:%v", v.actor, v.content)
+		}
+		fmt.Printf("\n")
+	}
 }
 
 // canReachNextLevel 是否可以进入到下一棒
