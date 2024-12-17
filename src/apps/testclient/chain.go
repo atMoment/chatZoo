@@ -2,6 +2,7 @@ package main
 
 import (
 	"ChatZoo/common"
+	"ChatZoo/common/music"
 	"bufio"
 	"errors"
 	"fmt"
@@ -178,6 +179,7 @@ func (r *_User) SRPC_ChainGameTurnBegin(key string) {
 
 func (r *_User) SPRC_ChainGameOver() {
 	fmt.Println("guess game over")
+	music.PlayMusic("rain_thunder")
 }
 
 func analyseRpcReqRet(ret *common.CallRet) error {
