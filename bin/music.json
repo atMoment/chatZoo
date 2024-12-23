@@ -1,6 +1,8 @@
 {
-	"rain": "../res/rain.mp3",
-	"rain_start": "../res/rain_start.mp3",
-	"rain_thunder": "../res/rain_thunder.mp3",
-	"song": "../res/song.mp3"
+	"ding": "../res/ding.mp3",
+	"drum_loop": "../res/drum_loop.mp3",
+	"forest": "../res/forest.mp3",
+	"human_cheer": "../res/human_cheer.mp3",
+	"pause": "../res/pause.mp3",
+	"summer": "../res/summer.mp3"
 }

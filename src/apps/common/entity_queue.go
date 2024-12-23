@@ -12,16 +12,17 @@ const (
 )
 
 type IEntityRpcQueue interface {
-	Push(index int32, method reflect.Value, args []reflect.Value)
-	Pop() ([]reflect.Value, int32)
+	Push(index int32, method reflect.Value, args []reflect.Value) bool
+	Pop() ([]reflect.Value, int32, bool)
 }
 
-// 很简陋的单协程队列, 保证每个函数执行时只有它自己, 目前满了直接丢掉
+// 目前满了会阻塞, 有优化空间
 // 可以用任意容器做队列, 我自己用的链表, 先进先出
 
 type _RpcQueue struct {
 	firstNode *_RpcCell
 	length    int
+	close     bool
 	lock      sync.Mutex
 	cond      *sync.Cond
 }
@@ -41,17 +42,51 @@ func NewRpcQueue() IEntityRpcQueue {
 	return ret
 }
 
-func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value) {
+func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value) bool {
+	if q.close { // 如果关闭了就不push
+		return true
+	}
 	// 插入的时候如果满了, 采取的方案是不再接收, 但这肯定不是最好的方案
 	q.cond.L.Lock()
 	defer func() {
 		q.cond.L.Unlock()
 		q.cond.Signal()
 	}()
-	if q.length == QueueMacLength {
+	for q.length == QueueMacLength && !q.close {
 		fmt.Println("q.length is max")
 		q.cond.Wait()
 	}
+	if q.length < QueueMacLength {
+		q.queuePush(index, method, args)
+		return q.close
+	}
+	return q.close
+}
+func (q *_RpcQueue) Pop() ([]reflect.Value, int32, bool) {
+	q.cond.L.Lock()
+	defer func() {
+		q.cond.L.Unlock()
+		q.cond.Signal()
+	}()
+	for q.length == 0 && !q.close {
+		q.cond.Wait()
+	}
+	if q.length > 0 {
+		return q.queuePop()
+	}
+	return nil, 0, q.close
+}
+
+func (q *_RpcQueue) Close() {
+	q.cond.L.Lock()
+	defer func() {
+		q.cond.L.Unlock()
+		q.cond.Signal()
+	}()
+	q.close = true
+}
+
+func (q *_RpcQueue) queuePush(index int32, method reflect.Value, args []reflect.Value) {
 	newNode := &_RpcCell{
 		method: method,
 		args:   args,
@@ -69,15 +104,7 @@ func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value
 	}
 	n.next = newNode
 }
-func (q *_RpcQueue) Pop() ([]reflect.Value, int32) {
-	q.cond.L.Lock()
-	defer func() {
-		q.cond.L.Unlock()
-		q.cond.Signal()
-	}()
-	if q.length == 0 {
-		q.cond.Wait()
-	}
+func (q *_RpcQueue) queuePop() ([]reflect.Value, int32, bool) {
 	method := q.firstNode.method
 	args := q.firstNode.args
 	msgIndex := q.firstNode.Index
@@ -90,5 +117,5 @@ func (q *_RpcQueue) Pop() ([]reflect.Value, int32) {
 	if after.Sub(before).Milliseconds() > time.Duration(2000*time.Second).Milliseconds() {
 		fmt.Println("exec func too slow ", after.Sub(before).Milliseconds())
 	}
-	return rets, msgIndex
+	return rets, msgIndex, false
 }

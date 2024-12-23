@@ -179,7 +179,7 @@ func (r *_User) SRPC_ChainGameTurnBegin(key string) {
 
 func (r *_User) SPRC_ChainGameOver() {
 	fmt.Println("guess game over")
-	music.PlayMusic("rain_thunder")
+	music.PlayMusic("human_cheer")
 }
 
 func analyseRpcReqRet(ret *common.CallRet) error {
