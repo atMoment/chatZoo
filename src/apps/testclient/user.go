@@ -37,7 +37,7 @@ func NewUser(entityID string, conn net.Conn) *_User {
 
 func (u *_User) play() {
 	// 试过wg.Add(1) 放到子协程开始, 但是主协程可能等不到子协程开始就执行wg.Wait(),然后就结束程序了
-	u.wg.Add(2)
+	u.wg.Add(3)
 	go u.receiveLoop()
 	go u.dealLoop()
 	go u.sendLoop()
@@ -73,12 +73,11 @@ func (u *_User) receiveLoop() {
 }
 
 func (u *_User) dealLoop() {
+	defer func() { u.wg.Done(); fmt.Println("dealLoop over") }()
 	for {
-		select {
-		case <-u.stopCh:
+		_, _, isClose := u.GetRpcQueue().Pop()
+		if isClose {
 			return
-		default:
-			u.GetRpcQueue().Pop() // todo 需要等待处理完
 		}
 	}
 }
@@ -103,14 +102,3 @@ func (u *_User) getPlayerInputModuleName() reflect.Value {
 		fmt.Println("模块名不对, 请重新输入 ", cmd)
 	}
 }
-
-/*
-想要的结果, 显示推荐房间、创建房间、加入房间
-只允许玩家发送1,2,3
-玩家选择了2 和 3, 发到服务器成功了, 进入到下一个阶段
-                发到服务器失败了, 再次显示这个
-
-下一个阶段, 提示玩家准备
-只允许玩家发送5, 发到服务器成功了, 进入到下一个阶段
-下一个阶段, 等待通知开始后, 输入 6 内容
-*/

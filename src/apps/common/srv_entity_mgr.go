@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+var NoFindEntity = errors.New("userid not find")
+
 type IEntityMgr interface {
 	AddEntity(entityID string, entity IEntityInfo)
 	AddOrGetEntity(entityID string, entity IEntityInfo) (IEntityInfo, error)
@@ -47,7 +49,7 @@ func (mgr *_EntityMgr) AddOrGetEntity(entityID string, entity IEntityInfo) (IEnt
 func (mgr *_EntityMgr) GetEntity(entityID string) (IEntityInfo, error) {
 	entityInfo, ok := mgr.entityList.Load(entityID)
 	if !ok {
-		return nil, errors.New("userid not find")
+		return nil, NoFindEntity
 	}
 	ret, ok := entityInfo.(IEntityInfo)
 	if !ok {

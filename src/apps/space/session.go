@@ -23,123 +23,77 @@ import (
 */
 
 const (
-	TickerInterval = 3 * time.Second
-	chCacheSize    = 1024
+	TickerInterval           = 3 * time.Second
+	SessionWaitLoginDuration = 5 * time.Second
+	chCacheSize              = 1024
 )
 
 type _Session struct {
-	user      *_User
-	conn      net.Conn
-	wg        *sync.WaitGroup // 通知我的父协程我结束了
-	ticker    *time.Ticker
-	ctx       context.Context    // 用于接收父协程结束的信号
-	cancel    context.CancelFunc // 暂时没用
-	cacheUtil db.ICacheUtil
+	gateUser     *_User
+	conn         net.Conn
+	wg           *sync.WaitGroup // 通知我的父协程我结束了
+	ticker       *time.Ticker
+	ctx          context.Context    // 用于接收父协程结束的信号
+	cancel       context.CancelFunc // 暂时没用
+	cacheUtil    db.ICacheUtil
+	loginSuccess chan struct{}
 	//sendCh    chan common.IMessage // 需要往套接字里写的消息都放这里
 }
 
 func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup, cacheUtil db.ICacheUtil) *_Session {
 	ctx, cancel := context.WithCancel(appCtx)
 	s := &_Session{
-		wg:        wg,
-		ctx:       ctx,
-		cancel:    cancel,
-		conn:      conn,
-		ticker:    time.NewTicker(TickerInterval),
-		cacheUtil: cacheUtil,
-		//sendCh:    make(chan common.IMessage, chCacheSize),
+		wg:           wg,
+		ctx:          ctx,
+		cancel:       cancel,
+		conn:         conn,
+		ticker:       time.NewTicker(TickerInterval),
+		cacheUtil:    cacheUtil,
+		loginSuccess: make(chan struct{}, 1),
 	}
 	return s
 }
 
-// 这里处理不了了,开始狗屎起来
+// session 只是gate user登录之前的中间态
 func (s *_Session) procLoop() {
-	s.wg.Add(1)
-	defer func() {
-		fmt.Println("goroutine : session proc exit", s.conn.RemoteAddr())
+	defer s.wg.Done()
+	go s.waitLogin()
+	select {
+	case <-s.ctx.Done():
 		s.conn.Close()
-		s.wg.Done()
-	}()
-	// 为什么不用 writeConn(), 因为目前有些问题没法解决
-	sessionWaitGroup := &sync.WaitGroup{}
-	sessionWaitGroup.Add(2)
-	go s.readConn(sessionWaitGroup) // 只管从网卡读取数据放到缓冲区去
-	go s.dealQueue(sessionWaitGroup)
-	sessionWaitGroup.Wait()
-	//go s.sendHeartbeat()
-}
-
-// dealQueue 从队列中读并支持
-func (s *_Session) dealQueue(w *sync.WaitGroup) {
-	// 从队列中取出来, 如果队列是空的,阻塞.   队列中有值了再唤醒
-	// 用channel 怎么实现？
-	// 如果阻塞中发了新号,怎么让它走到s.ctx.Done() 退出？
-	// 或者硬性规定, 每5000ms 执行一次pop.不行, 无法应对并发量过大的情况
-	defer w.Done()
-	for {
-		select {
-		case <-s.ctx.Done():
-			fmt.Println("session dealQueue receive exit signal")
-			return
-		default:
-		}
-		if s.user != nil {
-			rets, index := s.user.GetRpcQueue().Pop()
-			if index != 0 {
-				out := make([]interface{}, len(rets))
-				for i, ret := range rets {
-					out[i] = ret.Interface()
-				}
-				err := s.user.GetRpc().SendRsp(index, out...)
-				if err != nil {
-					fmt.Println("send rsp err:", err)
-				}
-			}
-		}
+		fmt.Println("session handleConnect receive exit signal")
+	case <-time.After(SessionWaitLoginDuration):
+		s.conn.Close()
+		fmt.Println("session handleConnect wait login over time")
+	case <-s.loginSuccess:
+		fmt.Println("session handleConnect login success")
 	}
 }
 
-// readConn 从套接字里持续不断地读
-func (s *_Session) readConn(w *sync.WaitGroup) {
-	defer w.Done()
-	for {
-		select {
-		case <-s.ctx.Done():
-			fmt.Println("session handleConnect receive exit signal")
-			return
-		default:
+func (s *_Session) waitLogin() {
+	// 服务器 conn close, err 为 use of closed network connection
+	msg, err := mmsg.ReadFromConn(s.conn)
+	if err != nil {
+		fmt.Println("waitLogin read conn err ", err)
+		return
+	}
+	switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
+	case *mmsg.MsgUserLogin:
+		createErr := s.createUser(m) // 这是一条非常特殊的消息
+		var errString string
+		if createErr != nil {
+			errString = createErr.Error()
 		}
-		if s.user == nil {
-			msg, err := mmsg.ReadFromConn(s.conn)
-			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
-				fmt.Println("session handleConnect conn read err ", err)
-				return
-			}
-			switch m := msg.(type) { // 又是反射, 迄今为止,所有的卡点都是反射
-			case *mmsg.MsgUserLogin:
-				err = s.createUser(m) // 这是一条非常特殊的消息
-				var errString string
-				if err != nil {
-					errString = err.Error()
-				}
-				err = mmsg.WriteToConn(s.conn, &mmsg.MsgUserLoginResp{
-					Err: errString,
-				})
-				if err != nil {
-					fmt.Println("deal user login msg", err)
-					return
-				}
-				fmt.Printf("gate login isSuccess:%v, openID:%v isVisitor:%v err:%v\n", errString == "", m.OpenID, m.IsVisitor, errString)
-			default:
-				fmt.Println("unknown msg ", msg.GetID())
-			}
+		if err = mmsg.WriteToConn(s.conn, &mmsg.MsgUserLoginResp{
+			Err: errString,
+		}); err != nil {
+			fmt.Println("deal user login msg", err)
 		} else {
-			err := s.user.GetRpc().ReceiveConn()
-			if err != nil { // 如果客户端关闭了, 这是err!=nil, 但是receiveCh里面还有数据, 也要处理完哦
-				fmt.Println("session handleConnect ReceiveConn ", err)
-				return
-			}
+			fmt.Printf("gate login isSuccess:%v, openID:%v isVisitor:%v err:%v\n", errString == "", m.OpenID, m.IsVisitor, errString)
 		}
+		close(s.loginSuccess)
+	default:
+		fmt.Println("unknown msg ", msg.GetID())
 	}
 }
 
@@ -182,6 +136,16 @@ func (s *_Session) sendHeartbeat() {
 	}
 }
 
+func (s *_Session) kickUser(openid string) {
+	entity, err := common.DefaultSrvEntity.GetEntity(openid)
+	if errors.Is(err, common.NoFindEntity) {
+		return // 不需要走下线
+	}
+
+	entity.GetRpcQueue().Close() // todo 等待全清理干净再上线
+	common.DefaultSrvEntity.DeleteEntity(s.gateUser.EntityInfo.GetEntityID())
+}
+
 // 怎么做到客户端等待服务器返回值的？
 // tcp 一来一回的怎么做到等待回的？  用channel, 直到回的那条来了才放开
 
@@ -205,7 +169,7 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 			return fmt.Errorf("new user err:%v", err2)
 		}
 		common.DefaultSrvEntity.AddEntity(openID, user)
-		s.user = user
+		s.gateUser = user
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 		return nil
 	}
@@ -219,7 +183,60 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 		return fmt.Errorf("new user err:%v", err)
 	}
 	common.DefaultSrvEntity.AddEntity(openID, user)
-	s.user = user
+	s.gateUser = user
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 	return nil
+}
+
+/////////////////  gate  user  ////////////////
+
+type _GateUser struct {
+	*_User
+	conn net.Conn
+	wg   *sync.WaitGroup
+}
+
+func (u *_GateUser) start() {
+	u.wg.Add(2)
+	go u.receive()
+	go u.loop()
+	u.wg.Wait()
+}
+
+func (u *_GateUser) destroy() {
+	u.GetRpcQueue().Close()
+}
+
+func (u *_GateUser) receive() {
+	defer u.wg.Done()
+	for {
+		err := u.GetRpc().ReceiveConn()
+		// 如果客户端关闭了, 这是err!=nil, 但是消息队列中里面还有数据, 也要处理完哦
+		// 可是处理消息的时候需要向客户端发送消息, conn 客户端关闭后必然也会出错
+		if err != nil {
+			u.destroy()
+			fmt.Printf("receive conn err:%v, gate user destroy, id:%v \n", err, u.GetEntityID())
+			return
+		}
+	}
+}
+
+func (u *_GateUser) loop() {
+	defer u.wg.Done()
+	for {
+		rets, index, isClose := u.GetRpcQueue().Pop()
+		if isClose {
+			return
+		}
+		if index != 0 {
+			out := make([]interface{}, len(rets))
+			for i, ret := range rets {
+				out[i] = ret.Interface()
+			}
+			err := u.GetRpc().SendRsp(index, out...)
+			if err != nil {
+				fmt.Println("send rsp err:", err)
+			}
+		}
+	}
 }

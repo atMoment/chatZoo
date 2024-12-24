@@ -32,12 +32,9 @@ func NewRoomEntity(entityID string) *RoomEntity {
 
 func (e *RoomEntity) loop() {
 	for {
-		select {
-		case <-e.stopCh:
+		_, _, isClose := e.rpcQueue.Pop()
+		if isClose {
 			return
-		// todo 不再接受push, 处理完队列中就结束, 要怎么做
-		default:
-			e.rpcQueue.Pop() // 但是队列为空的时候阻塞在这里, 没法进入循环, 没法进到 e.StopCh 的队列中
 		}
 	}
 }

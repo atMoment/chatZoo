@@ -65,6 +65,7 @@ func (a *_App) acceptHandler(ln net.Listener) {
 			return
 		}
 		session := NewSession(a.appCtx, conn, a.wg, a.cacheUtil)
+		a.wg.Add(1)
 		go session.procLoop()
 	}
 }

@@ -14,6 +14,7 @@ const (
 type IEntityRpcQueue interface {
 	Push(index int32, method reflect.Value, args []reflect.Value) bool
 	Pop() ([]reflect.Value, int32, bool)
+	Close()
 }
 
 // 目前满了会阻塞, 有优化空间
@@ -42,6 +43,7 @@ func NewRpcQueue() IEntityRpcQueue {
 	return ret
 }
 
+// Push 返回值为true, 表示已经关闭了, 不再push
 func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value) bool {
 	if q.close { // 如果关闭了就不push
 		return true
@@ -60,8 +62,10 @@ func (q *_RpcQueue) Push(index int32, method reflect.Value, args []reflect.Value
 		q.queuePush(index, method, args)
 		return q.close
 	}
-	return q.close
+	return true
 }
+
+// Pop 返回true, 表示是pop完队列中最后一个
 func (q *_RpcQueue) Pop() ([]reflect.Value, int32, bool) {
 	q.cond.L.Lock()
 	defer func() {
@@ -74,16 +78,14 @@ func (q *_RpcQueue) Pop() ([]reflect.Value, int32, bool) {
 	if q.length > 0 {
 		return q.queuePop()
 	}
-	return nil, 0, q.close
+	return nil, 0, true
 }
 
 func (q *_RpcQueue) Close() {
 	q.cond.L.Lock()
-	defer func() {
-		q.cond.L.Unlock()
-		q.cond.Signal()
-	}()
 	q.close = true
+	q.cond.L.Unlock()
+	q.cond.Signal()
 }
 
 func (q *_RpcQueue) queuePush(index int32, method reflect.Value, args []reflect.Value) {
