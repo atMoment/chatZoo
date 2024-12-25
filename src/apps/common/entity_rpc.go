@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+const (
+	HeartBeatIndex = -99
+)
+
 type IEntityRpc interface {
 	SendNotify(methodName string, arg ...interface{}) error
 	SendReq(methodName string, methodArgs ...interface{}) chan *CallRet
@@ -119,6 +123,8 @@ func (s *_EntityRpc) ReceiveConn() error {
 		if reqErr != nil {
 			fmt.Println("receiveNotify err ", reqErr)
 		}
+	case *mmsg.HeatBeat:
+		s.entity.GetRpcQueue().Push(HeartBeatIndex, reflect.Zero(nil), nil)
 	default:
 		fmt.Println("unsupported msg ", msg.GetID())
 		return nil

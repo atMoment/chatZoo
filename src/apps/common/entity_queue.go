@@ -111,6 +111,10 @@ func (q *_RpcQueue) queuePop() ([]reflect.Value, int32, bool) {
 	args := q.firstNode.args
 	msgIndex := q.firstNode.Index
 
+	if msgIndex == HeartBeatIndex {
+		return nil, msgIndex, false
+	}
+
 	q.firstNode = q.firstNode.next
 	q.length--
 	before := time.Now()

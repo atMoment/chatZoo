@@ -23,6 +23,7 @@ func init() {
 	AllMsgMap[MsgID_UserLoginResp] = &MsgUserLoginResp{}
 	AllMsgMap[MsgID_UserLogout] = &MsgUserLogout{}
 	AllMsgMap[MsgID_Notify] = &MsgNotify{}
+	AllMsgMap[MsgID_HeatBeat] = &HeatBeat{}
 }
 
 type IMessage interface {
@@ -30,7 +31,8 @@ type IMessage interface {
 }
 
 const (
-	MsgID_None = iota
+	MsgID_None     = iota
+	MsgID_HeatBeat = iota
 	MsgID_CmdReq
 	MsgID_CmdRsp
 	MsgID_UserLogin
@@ -91,4 +93,12 @@ type MsgNotify struct {
 
 func (m *MsgNotify) GetID() int32 {
 	return MsgID_Notify
+}
+
+type HeatBeat struct {
+	msg string
+}
+
+func (m *HeatBeat) GetID() int32 {
+	return MsgID_HeatBeat
 }

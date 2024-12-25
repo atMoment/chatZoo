@@ -59,13 +59,13 @@ func (s *_Session) procLoop() {
 	defer s.wg.Done()
 	go s.waitLogin()
 	select {
-	case <-s.ctx.Done():
+	case <-s.ctx.Done(): // 等待登录中收到关服信号
 		s.conn.Close()
 		fmt.Println("session handleConnect receive exit signal")
-	case <-time.After(SessionWaitLoginDuration):
+	case <-time.After(SessionWaitLoginDuration): //等待超时
 		s.conn.Close()
 		fmt.Println("session handleConnect wait login over time")
-	case <-s.loginSuccess:
+	case <-s.loginSuccess: // 登录成功
 		fmt.Println("session handleConnect login success")
 	}
 }
@@ -192,8 +192,20 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 
 type _GateUser struct {
 	*_User
-	conn net.Conn
-	wg   *sync.WaitGroup
+	conn              net.Conn
+	wg                *sync.WaitGroup
+	heartbeatOverTime *time.Ticker
+	receiveHeartbeat  chan struct{}
+	isDestroy         chan struct{}
+}
+
+func NewGateUser(conn net.Conn) *_GateUser {
+	return &_GateUser{
+		conn:              conn,
+		heartbeatOverTime: time.NewTicker(TickerInterval),
+		receiveHeartbeat:  make(chan struct{}, 1),
+		isDestroy:         make(chan struct{}, 1),
+	}
 }
 
 func (u *_GateUser) start() {
@@ -205,8 +217,11 @@ func (u *_GateUser) start() {
 
 func (u *_GateUser) destroy() {
 	u.GetRpcQueue().Close()
+	u.isDestroy <- struct{}{}
+	u.conn.Close()
 }
 
+// receive  本质上是 conn.Read, 失败了表示与客户端断联
 func (u *_GateUser) receive() {
 	defer u.wg.Done()
 	for {
@@ -221,12 +236,16 @@ func (u *_GateUser) receive() {
 	}
 }
 
+// loop 本质上是 处理事件
 func (u *_GateUser) loop() {
 	defer u.wg.Done()
 	for {
 		rets, index, isClose := u.GetRpcQueue().Pop()
 		if isClose {
 			return
+		}
+		if index == common.HeartBeatIndex {
+
 		}
 		if index != 0 {
 			out := make([]interface{}, len(rets))
@@ -236,6 +255,34 @@ func (u *_GateUser) loop() {
 			err := u.GetRpc().SendRsp(index, out...)
 			if err != nil {
 				fmt.Println("send rsp err:", err)
+			}
+		}
+	}
+}
+
+func (u *_GateUser) receiveHeartBeat() {
+	for {
+		select {
+		case <-u.receiveHeartbeat:
+			u.heartbeatOverTime.Reset(TickerInterval)
+		case <-u.heartbeatOverTime.C:
+			u.destroy()
+			return
+		case <-u.isDestroy:
+			return
+		}
+	}
+}
+
+func (u *_GateUser) sendHeartBeat() {
+	for {
+		select {
+		case <-time.Tick(3 * time.Second):
+			msg := &mmsg.HeatBeat{}
+			err := mmsg.WriteToConn(u.conn, msg)
+			if err != nil {
+				u.destroy()
+				return
 			}
 		}
 	}
