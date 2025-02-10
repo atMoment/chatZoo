@@ -1,0 +1,6 @@
+2025年第一写， 发现去年的逻辑全忘了！我自己写的逻辑哎。 特增加 note.txt.  设计思路放此处。时常更新。 
+----------   2025.2.10 更新    ----------
+app  - 主协程等待 kill信号  
+        - go  acceptHandler()   -  主协程 循环ln.Accept() 创建session,  并等待失败
+                                           -  go  session.procLoop()       -  主协程等待退出信号
+                                                                                       -   go  session.waitLogin()      - 阻塞从conn中读取客户端消息,   -  createGateUser  -  go gateUser.start()

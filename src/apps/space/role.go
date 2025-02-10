@@ -4,7 +4,6 @@ import (
 	"ChatZoo/common"
 	"fmt"
 	"net"
-	"sync"
 )
 
 // 设计上一个玩家只能加入一个房间
@@ -14,13 +13,6 @@ type _User struct {
 }
 
 func NewUser(entityID string, conn net.Conn) (*_User, error) {
-	gateUser := &_GateUser{
-		_User: &_User{EntityInfo: common.NewEntityInfo(entityID, conn)},
-		conn:  conn,
-		wg:    &sync.WaitGroup{},
-	}
-	gateUser.start()
-
 	user := &_User{EntityInfo: common.NewEntityInfo(entityID, conn)}
 	user.SetRpc(user)
 	return user, nil

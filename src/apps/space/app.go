@@ -51,6 +51,7 @@ func (a *_App) Run() {
 
 	ln.Close()   // 发通知让子协程acceptHandler 退出
 	<-a.exitChan // 阻塞住, 为的是等待所有子协程都退出主协程才退出
+	DefaultGateSrvEntity.Destroy()
 }
 
 // acceptHandler ln 可以直接复制!

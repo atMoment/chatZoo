@@ -1,7 +1,6 @@
 package main
 
 import (
-	"ChatZoo/common"
 	"ChatZoo/common/db"
 	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
@@ -29,14 +28,14 @@ const (
 )
 
 type _Session struct {
-	gateUser     *_User
 	conn         net.Conn
 	wg           *sync.WaitGroup // 通知我的父协程我结束了
 	ticker       *time.Ticker
 	ctx          context.Context    // 用于接收父协程结束的信号
 	cancel       context.CancelFunc // 暂时没用
 	cacheUtil    db.ICacheUtil
-	loginSuccess chan struct{}
+	loginFail    chan struct{} // 登录失败信号
+	loginSuccess chan struct{} // 登录成功信号
 	//sendCh    chan common.IMessage // 需要往套接字里写的消息都放这里
 }
 
@@ -49,6 +48,7 @@ func NewSession(appCtx context.Context, conn net.Conn, wg *sync.WaitGroup, cache
 		conn:         conn,
 		ticker:       time.NewTicker(TickerInterval),
 		cacheUtil:    cacheUtil,
+		loginFail:    make(chan struct{}, 1),
 		loginSuccess: make(chan struct{}, 1),
 	}
 	return s
@@ -60,17 +60,24 @@ func (s *_Session) procLoop() {
 	go s.waitLogin()
 	select {
 	case <-s.ctx.Done(): // 等待登录中收到关服信号
-		s.conn.Close()
+		s.conn.Close() // 子协程直接退出
 		fmt.Println("session handleConnect receive exit signal")
-	case <-time.After(SessionWaitLoginDuration): //等待超时
-		s.conn.Close()
-		fmt.Println("session handleConnect wait login over time")
-	case <-s.loginSuccess: // 登录成功
-		fmt.Println("session handleConnect login success")
+	case <-s.loginFail: // 登录失败
+		s.conn.Close() // 子协程直接退出
+		fmt.Println("session login fail")
 	}
 }
 
 func (s *_Session) waitLogin() {
+	// 超时和收到客户端一条消息不是登录都算登录失败
+	go func() {
+		select {
+		case <-s.loginSuccess: // 收到成功就返回不再计算超时时间
+		case <-time.After(SessionWaitLoginDuration):
+			close(s.loginFail)
+		}
+	}()
+
 	// 服务器 conn close, err 为 use of closed network connection
 	msg, err := mmsg.ReadFromConn(s.conn)
 	if err != nil {
@@ -93,6 +100,7 @@ func (s *_Session) waitLogin() {
 		}
 		close(s.loginSuccess)
 	default:
+		close(s.loginFail)
 		fmt.Println("unknown msg ", msg.GetID())
 	}
 }
@@ -136,16 +144,6 @@ func (s *_Session) sendHeartbeat() {
 	}
 }
 
-func (s *_Session) kickUser(openid string) {
-	entity, err := common.DefaultSrvEntity.GetEntity(openid)
-	if errors.Is(err, common.NoFindEntity) {
-		return // 不需要走下线
-	}
-
-	entity.GetRpcQueue().Close() // todo 等待全清理干净再上线
-	common.DefaultSrvEntity.DeleteEntity(s.gateUser.EntityInfo.GetEntityID())
-}
-
 // 怎么做到客户端等待服务器返回值的？
 // tcp 一来一回的怎么做到等待回的？  用channel, 直到回的那条来了才放开
 
@@ -164,12 +162,8 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 		// 查重, 内存中没有这个entity
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
-		user, err2 := NewUser(openID, s.conn)
-		if err2 != nil {
-			return fmt.Errorf("new user err:%v", err2)
-		}
-		common.DefaultSrvEntity.AddEntity(openID, user)
-		s.gateUser = user
+		gateuser := NewGateUser(s.conn, openID)
+		DefaultGateSrvEntity.AddGateUser(openID, gateuser)
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 		return nil
 	}
@@ -178,112 +172,8 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 	// 名字查重, 存db, 有重复的就用userID
 	// 没有重复的就随机生成userID
 	// 创建一个entity ( 查重, userID 有没有重复)
-	user, err := NewUser(openID, s.conn)
-	if err != nil {
-		return fmt.Errorf("new user err:%v", err)
-	}
-	common.DefaultSrvEntity.AddEntity(openID, user)
-	s.gateUser = user
+	gateuser := NewGateUser(s.conn, openID)
+	DefaultGateSrvEntity.AddGateUser(openID, gateuser)
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 	return nil
-}
-
-/////////////////  gate  user  ////////////////
-
-type _GateUser struct {
-	*_User
-	conn              net.Conn
-	wg                *sync.WaitGroup
-	heartbeatOverTime *time.Ticker
-	receiveHeartbeat  chan struct{}
-	isDestroy         chan struct{}
-}
-
-func NewGateUser(conn net.Conn) *_GateUser {
-	return &_GateUser{
-		conn:              conn,
-		heartbeatOverTime: time.NewTicker(TickerInterval),
-		receiveHeartbeat:  make(chan struct{}, 1),
-		isDestroy:         make(chan struct{}, 1),
-	}
-}
-
-func (u *_GateUser) start() {
-	u.wg.Add(2)
-	go u.receive()
-	go u.loop()
-	u.wg.Wait()
-}
-
-func (u *_GateUser) destroy() {
-	u.GetRpcQueue().Close()
-	u.isDestroy <- struct{}{}
-	u.conn.Close()
-}
-
-// receive  本质上是 conn.Read, 失败了表示与客户端断联
-func (u *_GateUser) receive() {
-	defer u.wg.Done()
-	for {
-		err := u.GetRpc().ReceiveConn()
-		// 如果客户端关闭了, 这是err!=nil, 但是消息队列中里面还有数据, 也要处理完哦
-		// 可是处理消息的时候需要向客户端发送消息, conn 客户端关闭后必然也会出错
-		if err != nil {
-			u.destroy()
-			fmt.Printf("receive conn err:%v, gate user destroy, id:%v \n", err, u.GetEntityID())
-			return
-		}
-	}
-}
-
-// loop 本质上是 处理事件
-func (u *_GateUser) loop() {
-	defer u.wg.Done()
-	for {
-		rets, index, isClose := u.GetRpcQueue().Pop()
-		if isClose {
-			return
-		}
-		if index == common.HeartBeatIndex {
-
-		}
-		if index != 0 {
-			out := make([]interface{}, len(rets))
-			for i, ret := range rets {
-				out[i] = ret.Interface()
-			}
-			err := u.GetRpc().SendRsp(index, out...)
-			if err != nil {
-				fmt.Println("send rsp err:", err)
-			}
-		}
-	}
-}
-
-func (u *_GateUser) receiveHeartBeat() {
-	for {
-		select {
-		case <-u.receiveHeartbeat:
-			u.heartbeatOverTime.Reset(TickerInterval)
-		case <-u.heartbeatOverTime.C:
-			u.destroy()
-			return
-		case <-u.isDestroy:
-			return
-		}
-	}
-}
-
-func (u *_GateUser) sendHeartBeat() {
-	for {
-		select {
-		case <-time.Tick(3 * time.Second):
-			msg := &mmsg.HeatBeat{}
-			err := mmsg.WriteToConn(u.conn, msg)
-			if err != nil {
-				u.destroy()
-				return
-			}
-		}
-	}
 }
