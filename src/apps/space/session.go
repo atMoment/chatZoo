@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ChatZoo/common"
 	"ChatZoo/common/db"
 	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
@@ -163,7 +164,7 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 		// 不存数据库, 创建一个entity
 		// 成功失败都要返回客户端消息
 		gateuser := NewGateUser(s.conn, openID)
-		DefaultGateSrvEntity.AddGateUser(openID, gateuser)
+		common.DefaultSrvEntity.AddEntityToMgr(openID, gateuser)
 		fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 		return nil
 	}
@@ -173,7 +174,7 @@ func (s *_Session) createUser(msg *mmsg.MsgUserLogin) error {
 	// 没有重复的就随机生成userID
 	// 创建一个entity ( 查重, userID 有没有重复)
 	gateuser := NewGateUser(s.conn, openID)
-	DefaultGateSrvEntity.AddGateUser(openID, gateuser)
+	common.DefaultSrvEntity.AddEntityToMgr(openID, gateuser)
 	fmt.Printf("rpcUserLogin success userID:%v isVisitor:%v\n", msg.OpenID, msg.IsVisitor)
 	return nil
 }

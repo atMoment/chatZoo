@@ -7,6 +7,7 @@ import (
 type IRpcMgr interface {
 	SendNotifyToEntityList(userIds map[string]struct{}, methodName string, arg ...interface{})
 	SendNotifyToEntity(userid string, methodName string, arg ...interface{})
+	SendLogout(userid string, reason string)
 }
 
 type _RpcMgr struct {
@@ -62,6 +63,30 @@ func (s *_RpcMgr) SendNotifyToEntity(userid string, methodName string, arg ...in
 		err := entity.GetRpc().SendNotify(methodName, arg...)
 		if err != nil {
 			fmt.Printf("SendNotify err:%v, methodName:%v args:%v id:%v \n", err, methodName, arg, entity.GetEntityID())
+		}
+		return false // 退出循环
+	}
+	s.TravelMgr(f)
+}
+
+func (s *_RpcMgr) SendLogout(userid string, reason string) {
+	f := func(key, value any) bool {
+		id, keyOk := key.(string)
+		if !keyOk {
+			fmt.Println("RpcToEntityList key not string")
+			return false
+		}
+		if id != userid {
+			return true
+		}
+		entity, valOk := value.(IEntityInfo)
+		if !valOk {
+			fmt.Println("RpcToEntityList value not _EntityInfo")
+			return false
+		}
+		err := entity.GetRpc().SendLogout(reason)
+		if err != nil {
+			fmt.Printf("SendLogout err:%v, id:%v \n", err, entity.GetEntityID())
 		}
 		return false // 退出循环
 	}

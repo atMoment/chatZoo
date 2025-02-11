@@ -18,6 +18,7 @@ const (
 type IEntityRpc interface {
 	SendNotify(methodName string, arg ...interface{}) error
 	SendReq(methodName string, methodArgs ...interface{}) chan *CallRet
+	SendLogout(reason string) error
 	SingleCall(methodName string, args ...interface{}) error
 	ReceiveConn() error
 	SendRsp(index int32, methodRets ...interface{}) error
@@ -125,6 +126,8 @@ func (s *_EntityRpc) ReceiveConn() error {
 		}
 	case *mmsg.HeatBeat:
 		s.entity.GetRpcQueue().Push(HeartBeatIndex, reflect.Zero(nil), nil)
+	case *mmsg.MsgUserLogout:
+		s.receiveLogout(m)
 	default:
 		fmt.Println("unsupported msg ", msg.GetID())
 		return nil
@@ -163,6 +166,18 @@ func (s *_EntityRpc) SendRsp(index int32, methodRets ...interface{}) error {
 		return fmt.Errorf("write to conn err %v", err)
 	}
 	return nil
+}
+
+func (s *_EntityRpc) SendLogout(reason string) error {
+	msg := &mmsg.MsgUserLogout{
+		UserID: s.entity.GetEntityID(),
+		Reason: reason,
+	}
+	return mmsg.WriteToConn(s.entity.GetNetConn(), msg)
+}
+
+func (s *_EntityRpc) receiveLogout(msg *mmsg.MsgUserLogout) {
+	// todo 收到立刻把自己踢下线, 进程关闭
 }
 
 func (s *_EntityRpc) receiveRsp(msg *mmsg.MsgCmdRsp) error {

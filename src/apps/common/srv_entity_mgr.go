@@ -13,7 +13,9 @@ type IEntityMgr interface {
 	AddOrGetEntity(entityID string, entity IEntityInfo) (IEntityInfo, error)
 	GetEntity(entityID string) (IEntityInfo, error)
 	DeleteEntity(entityID string)
+	LoadAndDeleteEntity(entityID string) bool
 	TravelMgr(f func(key, value any) bool)
+	Destroy()
 }
 
 type _EntityMgr struct {
@@ -26,6 +28,16 @@ func NewEntityMgr() *_EntityMgr {
 
 func (mgr *_EntityMgr) Start() {
 	fmt.Println("entity mgr start")
+}
+
+func (mgr *_EntityMgr) Destroy() {
+	f := func(key, value any) bool {
+		entityID := key.(string)
+		mgr.entityList.Delete(entityID)
+		value.(IEntityInfo).Destroy()
+		return true
+	}
+	mgr.TravelMgr(f)
 }
 
 func (mgr *_EntityMgr) AddEntity(entityID string, entity IEntityInfo) {
@@ -60,6 +72,11 @@ func (mgr *_EntityMgr) GetEntity(entityID string) (IEntityInfo, error) {
 
 func (mgr *_EntityMgr) DeleteEntity(entityID string) {
 	mgr.entityList.Delete(entityID)
+}
+
+func (mgr *_EntityMgr) LoadAndDeleteEntity(entityID string) bool {
+	_, ok := mgr.entityList.LoadAndDelete(entityID)
+	return ok
 }
 
 func (mgr *_EntityMgr) TravelMgr(f func(key, value any) bool) {

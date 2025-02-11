@@ -80,6 +80,7 @@ func (m *MsgUserLoginResp) GetID() int32 {
 
 type MsgUserLogout struct {
 	UserID string
+	Reason string
 }
 
 func (m *MsgUserLogout) GetID() int32 {

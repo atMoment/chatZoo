@@ -23,7 +23,7 @@ import (
 // todo 房间中有人离开了,如果正在进行某游戏流程,应该怎么做？ 这里简单处理为游戏结束, 还是需要动态调整让游戏继续玩下去？
 */
 const (
-	gameIntervalDuration = 5 * time.Minute
+	gameIntervalDuration = 2 * time.Minute
 	ComponentChain       = "ComponentChain"
 )
 

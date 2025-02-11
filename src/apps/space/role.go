@@ -7,10 +7,6 @@ import (
 )
 
 // 设计上一个玩家只能加入一个房间
-type _User struct {
-	*common.EntityInfo
-	joinRoomID string
-}
 
 func NewUser(entityID string, conn net.Conn) (*_User, error) {
 	user := &_User{EntityInfo: common.NewEntityInfo(entityID, conn)}

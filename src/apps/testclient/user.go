@@ -32,14 +32,13 @@ func NewUser(entityID string, conn net.Conn) *_User {
 	}
 	user.module = NewModule(user)
 	user.SetRpc(user)
+	go user.Loop()
 	return user
 }
 
 func (u *_User) play() {
 	// 试过wg.Add(1) 放到子协程开始, 但是主协程可能等不到子协程开始就执行wg.Wait(),然后就结束程序了
-	u.wg.Add(3)
-	go u.receiveLoop()
-	go u.dealLoop()
+	u.wg.Add(1)
 	go u.sendLoop()
 	u.wg.Wait()
 	u.stopCh <- struct{}{}
@@ -54,32 +53,10 @@ func (u *_User) destroy() {
 // 震惊！ conn直接复制可行
 // sendLoop 持续从标准输入中读取, 并发送给服务器
 func (u *_User) sendLoop() {
-	defer func() { u.wg.Done(); fmt.Println("sendLoop over") }()
+	defer func() { u.wg.Done(); fmt.Println("sendLoop over, 请等待答题") }()
 
 	moduleMethod := u.getPlayerInputModuleName()
 	moduleMethod.Call([]reflect.Value{})
-}
-
-// receiveLoop 持续接收来自服务器的消息
-func (u *_User) receiveLoop() {
-	defer func() { u.wg.Done(); fmt.Println("receiveLoop over") }()
-	for {
-		err := u.GetRpc().ReceiveConn()
-		if err != nil {
-			fmt.Println("common.ReadFromConn err", err)
-			return
-		}
-	}
-}
-
-func (u *_User) dealLoop() {
-	defer func() { u.wg.Done(); fmt.Println("dealLoop over") }()
-	for {
-		_, _, isClose := u.GetRpcQueue().Pop()
-		if isClose {
-			return
-		}
-	}
 }
 
 // //// 客户端表现模块
