@@ -67,6 +67,7 @@ func (e *EntityInfo) AddComponent(name string, c interface{}) {
 
 func (e *EntityInfo) Destroy() {
 	e.conn.Close()
+	fmt.Printf("entity destroy id:%v", e.entityID)
 }
 
 func (e *EntityInfo) Loop() {
@@ -75,7 +76,7 @@ func (e *EntityInfo) Loop() {
 	go e.push(wg)
 	go e.pop(wg)
 	wg.Wait()
-	fmt.Printf("entity loop exit\n")
+	fmt.Printf("entity loop exit id:%v\n", e.entityID)
 }
 
 func (e *EntityInfo) push(wg *sync.WaitGroup) {

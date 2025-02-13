@@ -71,11 +71,17 @@ func (mgr *_EntityMgr) GetEntity(entityID string) (IEntityInfo, error) {
 }
 
 func (mgr *_EntityMgr) DeleteEntity(entityID string) {
-	mgr.entityList.Delete(entityID)
+	e, ok := mgr.entityList.LoadAndDelete(entityID)
+	if ok {
+		e.(IEntityInfo).Destroy()
+	}
 }
 
 func (mgr *_EntityMgr) LoadAndDeleteEntity(entityID string) bool {
-	_, ok := mgr.entityList.LoadAndDelete(entityID)
+	e, ok := mgr.entityList.LoadAndDelete(entityID)
+	if ok {
+		e.(IEntityInfo).Destroy()
+	}
 	return ok
 }
 

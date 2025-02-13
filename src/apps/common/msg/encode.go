@@ -54,7 +54,24 @@ func encode(v reflect.Value, buff *bytes.Buffer) error {
 			}
 		}
 	case reflect.Slice: // todo 怎么知道slice 的元素类型？ 万一不是 []byte呢？ 而是 []string 或者 []int64? 会报错
-		writeBytes(v.Bytes(), buff)
+		switch v.Type().Elem().Kind() {
+		case reflect.String, reflect.Bool:
+			err := encode(reflect.ValueOf(v.Len()), buff)
+			if err != nil {
+				return err
+			}
+
+			for i := 0; i < v.Len(); i++ {
+				err = encode(v.Index(i), buff)
+				if err != nil {
+					return err
+				}
+			}
+		case reflect.Uint8: //支持 []byte
+			writeBytes(v.Bytes(), buff)
+		default:
+			return errors.New(fmt.Sprintf("%s, %d", "slice not support this type", v.Type().Elem().Kind()))
+		}
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type", v.Kind()))
 	}

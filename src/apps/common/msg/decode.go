@@ -121,14 +121,44 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			}
 		}
 	case reflect.Slice:
-		tmp, err := readBytes(buf) // todo 仅支持 []byte
+		var sliceSize int // 2 ^ 32 = 4G
+		err := decode(reflect.Indirect(reflect.ValueOf(&sliceSize)), buf)
 		if err != nil {
 			return err
 		}
-		if !v.CanSet() {
-			return errors.New("[decode] []byte the value can't be set")
+		switch v.Type().Elem().Kind() {
+		case reflect.String:
+			temp := make([]string, sliceSize)
+			ttemp := reflect.ValueOf(temp)
+			for i := 0; i < sliceSize; i++ {
+				err = decode(ttemp.Index(i), buf)
+				if err != nil {
+					return err
+				}
+			}
+			v.Set(ttemp)
+		case reflect.Bool:
+			temp := make([]bool, sliceSize)
+			ttemp := reflect.ValueOf(temp)
+			for i := 0; i < sliceSize; i++ {
+				err = decode(ttemp.Index(i), buf)
+				if err != nil {
+					return err
+				}
+			}
+			v.Set(ttemp)
+		case reflect.Uint8: //支持 []byte
+			tmp, err2 := readBytes(buf)
+			if err2 != nil {
+				return err2
+			}
+			if !v.CanSet() {
+				return errors.New("[decode] []byte the value can't be set")
+			}
+			v.SetBytes(tmp)
+		default:
+			return errors.New(fmt.Sprintf("%s, %d", "slice not support this type ", v.Type().Elem().Kind()))
 		}
-		v.SetBytes(tmp)
 
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type ", v.Kind()))

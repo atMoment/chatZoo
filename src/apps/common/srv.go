@@ -42,6 +42,6 @@ func (s *_Srv) AddEntityToMgr(entityID string, entity IEntityInfo) {
 }
 
 func (s *_Srv) RemEntityFromMgr(entityID, reason string) {
-	s.DeleteEntity(entityID)
 	s.SendLogout(entityID, reason)
+	s.DeleteEntity(entityID)
 }
