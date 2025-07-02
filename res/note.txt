@@ -3,4 +3,27 @@
 app  - 主协程等待 kill信号  
         - go  acceptHandler()   -  主协程 循环ln.Accept() 创建session,  并等待失败
                                            -  go  session.procLoop()       -  主协程等待退出信号
-                                                                                       -   go  session.waitLogin()      - 阻塞从conn中读取客户端消息,   -  createGateUser  -  go gateUser.start()
+                                                                                     -   go  session.waitLogin()      - 阻塞从conn中读取客户端消息,   -  createGateUser  -  go gateUser.start()
+
+
+----------   2025.06.30 更新  -----------
+客户端  注册/登录阶段 跳过
+
+_Module 里面隐式包含   函数设计为 f(){}
+|________  ChainModule  函数声明  Chain(){}
+|________  ChatModule   函数声明  Chat(){}
+
+对 _Module 做反射, 玩家输入声明的函数名称, 调用此函数
+
+// 可以不用隐式包含, 直接声明为 _Module 的函数, 引入新的结构是因为有的数据需要存在内存中
+
+
+
+
+想要新增的玩法
+1. 电梯玩法, 你是一个电梯, 1-9层, 一会刷新出不同的人, 需要在规定时间接到更多的人，你可以选择停也可以选择不停
+           双人玩法, 两部电梯同时接人, 等待时间过长, 人会离开, 你也接不到人
+2. 自走棋玩法
+3. 剧情选择。 参考十日终焉剧情, 给玩家选择, 多人同时操作。  随机分配角色和技能
+
+

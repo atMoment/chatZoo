@@ -32,6 +32,10 @@ const (
 	ChainStep_GameBegin
 )
 
+const (
+	ModuleNameChain = "Chain"
+)
+
 type ChainModule struct {
 	nextStage int
 	key       string
@@ -44,8 +48,12 @@ func NewChainModule(user *_User) *ChainModule {
 	}
 }
 
-func showRoomInfo() {
-	fmt.Println("this is chain module, 输入指令后回车换行结束 ")
+func (u *ChainModule) String() string {
+	return ModuleNameChain
+}
+
+func showRoomInfo(moduleName string) {
+	fmt.Printf("this is %s module, 输入指令后回车换行结束 \n", moduleName)
 	fmt.Printf("创建空房间请输入 [1 房间名字 房间最大人数] 示例：1 roomname 2 \n")
 	fmt.Printf("加入已有房间请输入 [2 房间名字] 示例：2 roomname  \n")
 	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
@@ -59,7 +67,7 @@ func (u *ChainModule) Chain() {
 func (u *ChainModule) selectRoom() {
 loop:
 	for {
-		showRoomInfo()
+		showRoomInfo(u.String())
 		err, cmds := waitPlayerInput(0)
 		if err != nil {
 			fmt.Printf("selectRoom input err:%v\n", err)

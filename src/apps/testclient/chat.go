@@ -16,14 +16,22 @@ const (
 	ChatRoom       = "101"
 )
 
-func (u *_Module) Chat() (string, string) {
-	fmt.Println("欢迎来到chat zoo, 输入指令后回车换行结束 ")
-	fmt.Printf("创建空房间请输入 [1 房间名字] 示例：1 myroomname \n")
-	fmt.Printf("加入已有房间请输入 [2 房间名字 房间类型(1聊天房, 2接龙房)] 示例：2 joinroomname 2 \n")
-	fmt.Printf("查看推荐房间请输入 [3] 示例：3 \n")
-	fmt.Printf("聊天请输入 [4 聊天内容] 示例：4 content \n")
-	fmt.Printf("guess room 准备请输入 [5 ready] 示例：5 content \n")
-	fmt.Printf("guess room 发言请输入 [6 接龙内容] 示例：6 content \n")
+type ChatModule struct {
+	user *_User
+}
+
+func NewChatModule(user *_User) *ChatModule {
+	return &ChatModule{
+		user: user,
+	}
+}
+
+func (u *ChatModule) String() string {
+	return ModuleNameChat
+}
+
+func (u *ChatModule) Chat() (string, string) {
+	showRoomInfo(u.String())
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
@@ -33,16 +41,15 @@ func (u *_Module) Chat() (string, string) {
 	}
 
 	// 把字符串中的\r\n筛选出来
-	words := ""
+	var builder strings.Builder
 	for _, v := range strings.Split(input, "\r\n") {
 		if v == "\r\n" {
 			break
 		}
-		words += v // todo 好像这种写法很消耗,有新的写法
+		builder.WriteString(v)
 	}
 
-	cmds := strings.Split(words, " ")
-
+	cmds := strings.Split(builder.String(), " ")
 	if len(cmds) == 0 {
 		fmt.Println(ModuleNameChat, " 无有效输入, 长度不对 ", len(cmds))
 		return "", ""

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (r *_User) Calculate(expression string) string {
+func (r *_User) CRPC_Calculate(expression string) string {
 	var ret string
 	result, err := calculate(expression)
 	if err != nil {
