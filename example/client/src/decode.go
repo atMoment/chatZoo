@@ -13,7 +13,7 @@ var buf *bytes.Buffer
 
 // 编码 将字节流转化为消息
 // 这里将字节流读到obj里
-func Decode(data []byte, obj interface{}) error{
+func Decode(data []byte, obj interface{}) error {
 	buf = bytes.NewBuffer(data)
 	err := decode(reflect.Indirect(reflect.ValueOf(obj)))
 	return err
@@ -64,11 +64,11 @@ func readInt8() (int8, error) {
 	return int8(n), err
 }
 
-func readUint8()(uint8, error) {
+func readUint8() (uint8, error) {
 	return buf.ReadByte()
 }
 
-func readInt32()(int32, error) {
+func readInt32() (int32, error) {
 	buff := make([]byte, 4)
 	n, err := buf.Read(buff)
 	if err != nil {
@@ -81,7 +81,7 @@ func readInt32()(int32, error) {
 	return int32(binary.LittleEndian.Uint32(buff)), nil
 }
 
-func readUint32()(uint32, error) {
+func readUint32() (uint32, error) {
 	buff := make([]byte, 4)
 	n, err := buf.Read(buff)
 	if err != nil {
@@ -102,13 +102,13 @@ func readBytes() ([]byte, error) {
 	}
 
 	if n < 0 {
-		return nil, errors.New("read buf failed type is []byte in decode")
+		return nil, errors.New("read buf failed type is []byte in decode, size < 0")
 	}
 
 	buff := make([]byte, n)
 	rn, err := buf.Read(buff)
 	if err != nil || rn != int(n) {
-		return nil, errors.New("read buf failed type is []byte in decode")
+		return nil, fmt.Errorf("read buf failed type is []byte in decode, err:%v or size not match:%v %v", err, rn, n)
 	}
 	return buff, nil
 }
@@ -121,6 +121,3 @@ func readString() (string, error) {
 
 	return string(str), err
 }
-
-
-

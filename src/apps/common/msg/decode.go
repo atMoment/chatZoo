@@ -28,7 +28,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] int8 the value can't be set")
+			return errors.New("[decode] bool the value can't be set")
 		}
 		v.SetBool(n)
 	case reflect.Int8:
@@ -109,7 +109,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			return err
 		}
 		if !v.CanSet() {
-			return errors.New("[decode] uint32 the value can't be set")
+			return errors.New("[decode] string the value can't be set")
 		}
 		v.SetString(s)
 	case reflect.Struct:
@@ -121,33 +121,7 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 			}
 		}
 	case reflect.Slice:
-		var sliceSize int // 2 ^ 32 = 4G
-		err := decode(reflect.Indirect(reflect.ValueOf(&sliceSize)), buf)
-		if err != nil {
-			return err
-		}
-		switch v.Type().Elem().Kind() {
-		case reflect.String:
-			temp := make([]string, sliceSize)
-			ttemp := reflect.ValueOf(temp)
-			for i := 0; i < sliceSize; i++ {
-				err = decode(ttemp.Index(i), buf)
-				if err != nil {
-					return err
-				}
-			}
-			v.Set(ttemp)
-		case reflect.Bool:
-			temp := make([]bool, sliceSize)
-			ttemp := reflect.ValueOf(temp)
-			for i := 0; i < sliceSize; i++ {
-				err = decode(ttemp.Index(i), buf)
-				if err != nil {
-					return err
-				}
-			}
-			v.Set(ttemp)
-		case reflect.Uint8: //支持 []byte
+		if v.Type().Elem().Kind() == reflect.Uint8 { //支持 []byte
 			tmp, err2 := readBytes(buf)
 			if err2 != nil {
 				return err2
@@ -156,10 +130,37 @@ func decode(v reflect.Value, buf *bytes.Buffer) error {
 				return errors.New("[decode] []byte the value can't be set")
 			}
 			v.SetBytes(tmp)
-		default:
-			return errors.New(fmt.Sprintf("%s, %d", "slice not support this type ", v.Type().Elem().Kind()))
+		} else {
+			var sliceSize int // 2 ^ 32 = 4G
+			err := decode(reflect.Indirect(reflect.ValueOf(&sliceSize)), buf)
+			if err != nil {
+				return err
+			}
+			switch v.Type().Elem().Kind() {
+			case reflect.String:
+				temp := make([]string, sliceSize)
+				ttemp := reflect.ValueOf(temp)
+				for i := 0; i < sliceSize; i++ {
+					err = decode(ttemp.Index(i), buf)
+					if err != nil {
+						return err
+					}
+				}
+				v.Set(ttemp)
+			case reflect.Bool:
+				temp := make([]bool, sliceSize)
+				ttemp := reflect.ValueOf(temp)
+				for i := 0; i < sliceSize; i++ {
+					err = decode(ttemp.Index(i), buf)
+					if err != nil {
+						return err
+					}
+				}
+				v.Set(ttemp)
+			default:
+				return errors.New(fmt.Sprintf("%s, %d", "slice not support this type ", v.Type().Elem().Kind()))
+			}
 		}
-
 	default:
 		return errors.New(fmt.Sprintf("%s, %d", "not support this type ", v.Kind()))
 	}
@@ -272,13 +273,13 @@ func readBytes(buf *bytes.Buffer) ([]byte, error) {
 	}
 
 	if n < 0 {
-		return nil, errors.New("read buf failed type is []byte in decode")
+		return nil, errors.New("read buf failed type is []byte in decode, size < 0")
 	}
 
 	bytesBuff := make([]byte, n)
 	rn, err := buf.Read(bytesBuff)
 	if err != nil || rn != int(n) {
-		return nil, errors.New("read buf failed type is []byte in decode")
+		return nil, fmt.Errorf("read buf failed type is []byte in decode, err:%v or size not match:%v %v", err, rn, n)
 	}
 	return bytesBuff, nil
 }
