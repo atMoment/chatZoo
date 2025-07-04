@@ -64,6 +64,26 @@ func (r *_User) CRPC_QuitRoom(roomID string) string {
 	return "success"
 }
 
+func (r *_User) CRPC_Chat(roomID, msg string) string {
+	room, err := roomMgr.GetEntity(r.joinRoomID)
+	if err != nil {
+		fmt.Printf("%v CRPC_Chat get entity err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
+	entity, ok := room.(common.IRoomEntity)
+	if !ok {
+		fmt.Printf("%v CRPC_Chat room can't trans entity\n ", r.GetEntityID())
+		return "failed"
+	}
+	err = entity.SingleCall(ComponentChat+".Chat", r.GetEntityID(), msg)
+	if err != nil {
+		fmt.Printf("%v CRPC_Chat single call failed, err:%v\n ", r.GetEntityID(), err)
+		return "failed"
+	}
+	fmt.Printf("CRPC_Chat success userid:%v, roomid:%v \n ", r.GetEntityID(), r.joinRoomID)
+	return "success"
+}
+
 func (r *_User) CRPC_ChainRoomReady() string {
 	room, err := roomMgr.GetEntity(r.joinRoomID)
 	if err != nil {

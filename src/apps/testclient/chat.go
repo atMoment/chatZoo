@@ -17,7 +17,8 @@ const (
 )
 
 type ChatModule struct {
-	user *_User
+	user       *_User
+	joinRoomID string // 加入的房间ID
 }
 
 func NewChatModule(user *_User) *ChatModule {
@@ -30,51 +31,124 @@ func (u *ChatModule) String() string {
 	return ModuleNameChat
 }
 
-func (u *ChatModule) Chat() (string, string) {
-	showRoomInfo(u.String())
+func (u *ChatModule) Chat() {
+	for {
+		err := u.chat()
+		if err != nil {
+			fmt.Println("chat err:%v", err)
+			return
+		}
+	}
+
+}
+
+func (u *ChatModule) chat() error {
+	if u.joinRoomID == "" {
+		showRoomInfo(u.String())
+	} else {
+		showChat()
+	}
 
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
 		fmt.Println(ModuleNameChat, " os.stdin read err ", inputErr)
-		return "", ""
+		return inputErr
 	}
 
-	// 把字符串中的\r\n筛选出来
-	var builder strings.Builder
-	for _, v := range strings.Split(input, "\r\n") {
-		if v == "\r\n" {
-			break
-		}
-		builder.WriteString(v)
-	}
-
-	cmds := strings.Split(builder.String(), " ")
+	cmds := strings.Split(dealInput4(input), " ")
 	if len(cmds) == 0 {
 		fmt.Println(ModuleNameChat, " 无有效输入, 长度不对 ", len(cmds))
-		return "", ""
+		return fmt.Errorf("input is empty")
 	}
-	var methodName string
-	var ret string
+	var err error
 	switch cmds[0] {
 	case CreateRoom: // 创建房间
-		fmt.Println(ModuleNameChat, "暂不支持, sorry")
-		return "", ""
+		if len(cmds) < 2 {
+			return fmt.Errorf("joinroom, len(cmds) < 2")
+		}
+		if len(cmds[1]) == 0 {
+			return fmt.Errorf("joinroom, roomid is empty")
+		}
+		err = u.createRoom(cmds[1], 100)
 	case JoinRoom:
-		methodName = "JoinRoom"
+		if len(cmds) < 2 {
+			return fmt.Errorf("joinroom, len(cmds) < 2")
+		}
+		if len(cmds[1]) == 0 {
+			return fmt.Errorf("joinroom, roomid is empty")
+		}
+		err = u.joinRoom(cmds[1])
 	case RecommendRoom:
-		fmt.Println(ModuleNameChat, "开发中...")
-		return "", ""
+		err = u.recommendRoom()
 	case ChatRoom:
-		methodName = "ChatRoom"
-	case RoomGuessReady:
-		methodName = "GuessRoomReady"
+		if len(cmds) < 2 {
+			return fmt.Errorf("joinroom, len(cmds) < 2")
+		}
+		if len(cmds[1]) == 0 {
+			return fmt.Errorf("joinroom, roomid is empty")
+		}
+		if len(u.joinRoomID) == 0 {
+			return fmt.Errorf("未加入房间")
+		}
+		u.chatRoom(cmds[1])
 	default:
 		fmt.Println(ModuleNameChat, " 参数不对 ")
-		return "", ""
 	}
-	ret = cmds[1]
-	return methodName, ret
+	return err
+}
+
+func (u *ChatModule) createRoom(roomid string, limit int) error {
+	methodName := "CRPC_CreateRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName, RoomType_Chat, roomid, limit)
+	err := analyseRpcReqRet(ret)
+	if err != nil {
+		return err
+	}
+	u.joinRoomID = roomid
+	fmt.Printf("create room %v success\n", roomid)
+	return nil
+}
+
+func (u *ChatModule) joinRoom(roomid string) error {
+	methodName := "CRPC_JoinRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName, roomid)
+	err := analyseRpcReqRet(ret)
+	if err != nil {
+		return err
+	}
+	u.joinRoomID = roomid
+	fmt.Printf("join room %v success\n", roomid)
+	return nil
+}
+
+func (u *ChatModule) recommendRoom() error {
+	methodName := "CRPC_GetRecommendRoom"
+	ret := <-u.user.GetRpc().SendReq(methodName)
+	err := analyseRpcReqRet(ret)
+	if err != nil {
+		return err
+	}
+	recommendList, ok := ret.Rets[1].([]string)
+	if !ok {
+		return fmt.Errorf("not []string")
+	}
+	fmt.Println("recommend room: ", recommendList)
+	return nil
+}
+
+func (u *ChatModule) chatRoom(msg string) error {
+	methodName := "CRPC_Chat"
+	ret := <-u.user.GetRpc().SendReq(methodName, u.joinRoomID, msg)
+	err := analyseRpcReqRet(ret)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func showChat() {
+	fmt.Printf("您已加入房间, 聊天请输入 [101 聊天内容]  \n")
 }
 
 //////////////     接收服务器回调函数    //////////////

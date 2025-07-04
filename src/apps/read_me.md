@@ -34,3 +34,7 @@
 
 IPv4网关
 IPv4网关是连接专有网络VPC（Virtual Private Cloud）和互联网（internet）的网络组件，VPC访问IPv4公网的流量经过IPv4网关，由IPv4网关实现路由转发以及私网地址到公网地址转换，最终实现对公网的访问。
+
+
+bug:
+1. 直接杀掉客户端以后再重新登录, 会聊不了天

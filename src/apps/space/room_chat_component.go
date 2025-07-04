@@ -25,6 +25,7 @@ func NewChatComponent(room IRoomBase) *_ChatComponent {
 	ChatComponent := &_ChatComponent{
 		IRoomBase: room,
 		msgCache:  make([]*_ChatComponentMsg, 0),
+		cfg:       &_ChatComponentCfg{cacheMsgLimit: 20},
 	}
 	return ChatComponent
 }

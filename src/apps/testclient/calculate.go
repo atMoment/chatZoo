@@ -11,7 +11,10 @@ import (
 
 const (
 	ModuleNameCalculate = "Calculate"
+	ModuleCalculateOver = "over"
 )
+
+var ErrModuleCalculateOver = errors.New(ModuleCalculateOver)
 
 type CalculateModule struct {
 	user *_User
@@ -29,23 +32,41 @@ func (u *CalculateModule) String() string {
 
 // Fouroperationcalculate 根据标准输入向服务器发送 四则运算表达式运算请求
 func (u *CalculateModule) Fouroperationcalculate() {
-	fmt.Println("已连接计算服务器,请输入你的四则运算公式, 空格分割, \\n 为结束符, 例如 [3 * 3 + 9]")
+	for {
+		err := u.fouroperationcalculate()
+		if err != nil {
+			if errors.Is(err, ErrModuleCalculateOver) {
+				break
+			} else {
+				fmt.Printf("输入有误\n")
+			}
+		}
+	}
+}
+
+func (u *CalculateModule) fouroperationcalculate() error {
+	fmt.Printf("已连接计算服务器,请输入你的四则运算公式, 空格分割, \\n 为结束符, 例如 [3 * 3 + 9],  结束请输入%s\n", ModuleCalculateOver)
 	//fmt.Scanln(&word) // 从标准控制中输入,以空格分隔
 	inputReader := bufio.NewReader(os.Stdin)
 	input, inputErr := inputReader.ReadString('\n') // 回车
 	if inputErr != nil {
 		fmt.Println("os.stdin read err ", inputErr)
-		return
+		return inputErr
+	}
+	finalInput := dealInput4(input) // 排除过\r\n的输入
+	if finalInput == ModuleCalculateOver {
+		return ErrModuleCalculateOver
 	}
 
 	methodName := "CRPC_Calculate"
-	ret := <-u.user.GetRpc().SendReq(methodName, dealInput4(input))
+	ret := <-u.user.GetRpc().SendReq(methodName, finalInput)
 	result, err := getRpcReqRetString(ret)
 	if err != nil {
 		fmt.Println("get result err ", err)
 	} else {
 		fmt.Println("result is ", result)
 	}
+	return nil
 }
 
 func getRpcReqRetString(ret *common.CallRet) (string, error) {
@@ -104,6 +125,7 @@ func dealInput3(input string) string {
 	return ""
 }
 
+// 把字符串中的\r\n筛选出来
 func dealInput4(input string) string {
 	var builder strings.Builder
 	for _, v := range strings.Split(input, "\r\n") {

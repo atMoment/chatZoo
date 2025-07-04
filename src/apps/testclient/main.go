@@ -6,7 +6,6 @@ import (
 	"ChatZoo/common/hhttp"
 	"ChatZoo/common/login"
 	mmsg "ChatZoo/common/msg"
-	"ChatZoo/common/music"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -60,7 +60,7 @@ func main() {
 	}
 	defer user.destroy()
 	go user.play()
-	go music.PlayMusic("forest")
+	//go music.PlayMusic("forest")
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
@@ -127,14 +127,17 @@ func waitLoginResp(conn net.Conn) error {
 func showGameHall(openid string, moduleList []string) string {
 	fmt.Printf("%s welcome to chatZoo, this is game hall. we support some game ", openid)
 	fmt.Println("[ > w < ]. [ * v * ]. [ /// - /// ]. [ ` ~ ` ]. [ :) ] ")
-	var moduleName string
-	for _, v := range moduleList {
-		fmt.Printf(" [%v] ", v)
+	var moduleNumber string
+
+	shows := make(map[string]string)
+	for i, v := range moduleList {
+		shows[strconv.Itoa(i)] = v
+		fmt.Printf("序号:%v 模块:%v \n", strconv.Itoa(i), v)
 	}
-	fmt.Printf("\n")
-	fmt.Println("请输入选择的模块")
-	fmt.Scanln(&moduleName)
-	return moduleName
+	fmt.Println("请输入选择的模块序号")
+	fmt.Scanln(&moduleNumber)
+
+	return shows[moduleNumber]
 }
 
 type _Client struct {
