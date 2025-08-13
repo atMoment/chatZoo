@@ -1,9 +1,32 @@
 2025年第一写， 发现去年的逻辑全忘了！我自己写的逻辑哎。 特增加 note.txt.  设计思路放此处。时常更新。 
-----------   2025.2.10 更新    ----------
-app  - 主协程等待 kill信号  
-        - go  acceptHandler()   -  主协程 循环ln.Accept() 创建session,  并等待失败
-                                           -  go  session.procLoop()       -  主协程等待退出信号
-                                                                                     -   go  session.waitLogin()      - 阻塞从conn中读取客户端消息,   -  createGateUser  -  go gateUser.start()
+----------   2025.8.13 更新    ----------
+
+app main()
+|__ 阻塞等待 kill信号
+|__ go  acceptHandler()
+
+acceptHandler()
+|__ 循环 执行conn, err := ln.Accept(), 直到 err!= nil, createSession(conn)
+|__ go  session.procLoop()
+
+session.procLoop()
+|__ select.case 阻塞等待各种信号
+|__ go session.waitLogin()
+
+session.waitLogin()
+|__ io.ReadFull() 阻塞读消息, 判断消息是否 mmsg.MsgUserLogin, 是则 createGateUser
+|__ go gateUser.Loop()
+|__ go time.AfterFunc(超时处理)
+
+gateUser.Loop()
+|__ go entityInfo.push()
+|__ go entityInfo.pop()
+
+entityInfo.push()
+|__ 无限循环  io.ReadFull()
+
+entityInfo.pop()
+|__ 无限循环 从链表中拿到下一个
 
 
 ----------   2025.06.30 更新  -----------
